@@ -1,0 +1,7 @@
+# Local override only (not for Coolify): publish the port on the host.
+services:
+  app:
+    ports:
+      - "3000:3000"
+    environment:
+      - PUBLIC_URL=${PUBLIC_URL:-}

@@ -1,0 +1,32 @@
+# Works with Coolify's "Docker Compose" build pack and with plain `docker compose up`.
+# No host ports are published: Coolify's proxy routes the domain to port 3000.
+# For local use without Coolify, run `docker compose -f docker-compose.yml -f docker-compose.local.yml up`.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      # Tells Coolify to generate a domain for this service and route it to port 3000.
+      - SERVICE_FQDN_APP_3000
+      # Base URL used for QR codes / join links. Defaults to the Coolify domain;
+      # the server adds https:// if the value has no scheme. Empty = use the request host.
+      - PUBLIC_URL=${SERVICE_FQDN_APP}
+      - PORT=3000
+      - DATA_DIR=/data
+      - ROOM_TTL_HOURS=${ROOM_TTL_HOURS:-6}
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-5}
+      - MAX_ROOMS=${MAX_ROOMS:-200}
+      - MAX_PLAYERS_PER_ROOM=${MAX_PLAYERS_PER_ROOM:-100}
+    volumes:
+      - bracket-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  bracket-data:
