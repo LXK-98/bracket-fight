@@ -1,30 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
-import { roundName } from '../../../shared/bracket';
+import { useTranslation } from 'react-i18next';
 import { MAX_NAME_LENGTH, MAX_TEXT_LENGTH, SUDDEN_DEATH_SECONDS, type RoomView } from '../../../shared/types';
 import { Countdown } from '../components/Countdown';
 import { EntryCard } from '../components/EntryCard';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { VoteBar } from '../components/VoteBar';
+import { problemText, roundLabel, tNodes, toProblem, type Problem } from '../i18n/text';
 import { api } from '../lib/api';
 import { looksLikeImage, prepareImage } from '../lib/image';
 import { playerToken } from '../lib/storage';
-import { remainingMs, useRoom, useTick, type RoomConnection } from '../lib/useRoom';
+import { ackProblem, remainingMs, useRoom, useTick, type RoomConnection } from '../lib/useRoom';
 
 type Act = (event: string, payload?: object) => Promise<boolean>;
+type OnError = (p: Problem) => void;
 
 export function PlayerPage({ code }: { code: string }) {
+  const { t } = useTranslation();
   const conn = useRoom(code, 'player');
   const { view, fatal, needsJoin, connected } = conn;
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Problem | null>(null);
 
   useEffect(() => {
     if (!error) return;
-    const t = setTimeout(() => setError(null), 4000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
   }, [error]);
 
   const act: Act = async (event, payload) => {
     const res = await conn.emit(event, payload);
-    if (!res.ok) setError(res.error);
+    if (!res.ok) setError(ackProblem(res));
     return res.ok;
   };
 
@@ -32,16 +36,16 @@ export function PlayerPage({ code }: { code: string }) {
   if (fatal) {
     body = (
       <div className="center-card">
-        <h2>{fatal}</h2>
+        <h2>{problemText(t, fatal)}</h2>
         <a className="btn btn-primary btn-big" href="/">
-          Back to start
+          {t('common.backToStart')}
         </a>
       </div>
     );
   } else if (needsJoin) {
     body = <JoinForm code={code} conn={conn} />;
   } else if (!view?.me) {
-    body = <div className="center-card muted">Connecting…</div>;
+    body = <div className="center-card muted">{t('common.connecting')}</div>;
   } else {
     body = <PlayerGame view={view} act={act} conn={conn} onError={setError} />;
   }
@@ -55,33 +59,33 @@ export function PlayerPage({ code }: { code: string }) {
         <span className="player-bar-right">
           {view?.me && <span className="me-name">{view.me.name}</span>}
           <span className="code-pill">{code}</span>
+          <LanguageSwitcher compact />
         </span>
       </header>
-      {!connected && !fatal && <div className="banner banner-warn">Reconnecting…</div>}
+      {!connected && !fatal && <div className="banner banner-warn">{t('common.reconnecting')}</div>}
       <main className="player-main">{body}</main>
-      {error && <div className="toast">{error}</div>}
+      {error && <div className="toast">{problemText(t, error)}</div>}
     </div>
   );
 }
 
 function JoinForm({ code, conn }: { code: string; conn: RoomConnection }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Problem | null>(null);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     const res = await conn.join(name);
     setBusy(false);
-    if (!res.ok) setError(res.error);
+    if (!res.ok) setError(ackProblem(res));
   };
   return (
     <form className="center-card join-form" onSubmit={submit}>
-      <h2>
-        Joining room <span className="code-text">{code}</span>
-      </h2>
-      <label htmlFor="name">Your name</label>
+      <h2>{tNodes(t, 'player.joinForm.title', { code: <span className="code-text">{code}</span> })}</h2>
+      <label htmlFor="name">{t('player.joinForm.name')}</label>
       <input
         id="name"
         value={name}
@@ -90,17 +94,17 @@ function JoinForm({ code, conn }: { code: string; conn: RoomConnection }) {
         autoComplete="nickname"
         autoFocus
         enterKeyHint="go"
-        placeholder="e.g. Sam"
+        placeholder={t('player.joinForm.namePlaceholder')}
       />
       <button className="btn btn-primary btn-big" disabled={busy || !name.trim()}>
-        {busy ? 'Joining…' : 'Join'}
+        {busy ? t('player.joinForm.joining') : t('player.joinForm.join')}
       </button>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">{problemText(t, error)}</p>}
     </form>
   );
 }
 
-function PlayerGame({ view, act, conn, onError }: { view: RoomView; act: Act; conn: RoomConnection; onError: (m: string) => void }) {
+function PlayerGame({ view, act, conn, onError }: { view: RoomView; act: Act; conn: RoomConnection; onError: OnError }) {
   switch (view.phase) {
     case 'lobby':
       return <PlayerLobby view={view} act={act} onError={onError} />;
@@ -117,21 +121,22 @@ function PlayerGame({ view, act, conn, onError }: { view: RoomView; act: Act; co
 
 // ------------------------------------------------------------------ lobby
 
-function PlayerLobby({ view, act, onError }: { view: RoomView; act: Act; onError: (m: string) => void }) {
+function PlayerLobby({ view, act, onError }: { view: RoomView; act: Act; onError: OnError }) {
+  const { t } = useTranslation();
   const me = view.me!;
   const [editing, setEditing] = useState(false);
 
   if (me.role === 'undecided') {
     return (
       <div className="stack">
-        <h2 className="center">How do you want to play?</h2>
+        <h2 className="center">{t('player.lobby.howToPlay')}</h2>
         <button className="btn btn-primary btn-choice" disabled={view.lobby.competitorsFull} onClick={() => act('player:setRole', { role: 'competitor' })}>
-          🥊 Compete
-          <small>{view.lobby.competitorsFull ? 'The bracket is full' : 'Submit an entry into the bracket'}</small>
+          {t('player.lobby.compete')}
+          <small>{view.lobby.competitorsFull ? t('player.lobby.bracketFull') : t('player.lobby.competeHint')}</small>
         </button>
         <button className="btn btn-secondary btn-choice" onClick={() => act('player:setRole', { role: 'voter' })}>
-          🗳️ Just vote
-          <small>Pick the winners of every matchup</small>
+          {t('player.lobby.justVote')}
+          <small>{t('player.lobby.justVoteHint')}</small>
         </button>
       </div>
     );
@@ -142,11 +147,11 @@ function PlayerLobby({ view, act, onError }: { view: RoomView; act: Act; onError
       <div className="stack">
         <div className="status-card">
           <div className="status-emoji">🗳️</div>
-          <h2>You're a voter</h2>
-          <p className="muted">Waiting for the host to start the game…</p>
+          <h2>{t('player.lobby.youreVoter')}</h2>
+          <p className="muted">{t('player.lobby.waitingForStart')}</p>
         </div>
         <button className="btn btn-ghost" disabled={view.lobby.competitorsFull} onClick={() => act('player:setRole', { role: 'competitor' })}>
-          {view.lobby.competitorsFull ? 'Bracket is full' : 'Switch to competing'}
+          {view.lobby.competitorsFull ? t('player.lobby.bracketFullShort') : t('player.lobby.switchToCompeting')}
         </button>
       </div>
     );
@@ -156,13 +161,13 @@ function PlayerLobby({ view, act, onError }: { view: RoomView; act: Act; onError
   if (me.submitted && !editing) {
     return (
       <div className="stack">
-        <div className="banner banner-ok">Entry submitted! Waiting for the host to start…</div>
+        <div className="banner banner-ok">{t('player.lobby.submitted')}</div>
         <EntryCard entry={me.entry ?? undefined} className="preview" />
         <button className="btn btn-secondary btn-big" onClick={() => setEditing(true)}>
-          Edit entry
+          {t('player.lobby.editEntry')}
         </button>
-        <button className="btn btn-ghost" onClick={() => confirm('Withdraw your entry and just vote?') && act('player:setRole', { role: 'voter' })}>
-          Switch to just voting
+        <button className="btn btn-ghost" onClick={() => confirm(t('player.lobby.withdrawConfirm')) && act('player:setRole', { role: 'voter' })}>
+          {t('player.lobby.switchToVoting')}
         </button>
       </div>
     );
@@ -171,7 +176,8 @@ function PlayerLobby({ view, act, onError }: { view: RoomView; act: Act; onError
   return <EntryEditor view={view} onDone={() => setEditing(false)} onError={onError} act={act} />;
 }
 
-function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: () => void; onError: (m: string) => void; act: Act }) {
+function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: () => void; onError: OnError; act: Act }) {
+  const { t } = useTranslation();
   const me = view.me!;
   const mode = view.settings.entryMode;
   const [text, setText] = useState(me.entry?.text ?? '');
@@ -194,7 +200,7 @@ function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: (
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!looksLikeImage(file)) return onError('Please choose an image file.');
+    if (!looksLikeImage(file)) return onError({ code: 'notAnImage' });
     setProcessing(true);
     try {
       const blob = await prepareImage(file);
@@ -202,7 +208,7 @@ function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: (
       setRemoveImage(false);
       setPreview(URL.createObjectURL(blob));
     } catch (err) {
-      onError((err as Error).message);
+      onError(toProblem(err));
     } finally {
       setProcessing(false);
     }
@@ -220,7 +226,7 @@ function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: (
 
   const submit = async () => {
     const token = playerToken.get(view.code);
-    if (!token) return onError('Session lost. Please rejoin.');
+    if (!token) return onError({ code: 'sessionLost' });
     const form = new FormData();
     form.append('text', allowText ? text : '');
     if (removeImage) form.append('removeImage', '1');
@@ -230,37 +236,37 @@ function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: (
       await api.submitEntry(view.code, token, form);
       onDone();
     } catch (err) {
-      onError((err as Error).message);
+      onError(toProblem(err));
     } finally {
       setUploading(false);
     }
   };
 
-  const hint = mode === 'image' ? 'Add an image' : mode === 'text' ? 'Write your entry' : 'Add an image, some text, or both';
+  const hint = mode === 'image' ? t('player.editor.hintImage') : mode === 'text' ? t('player.editor.hintText') : t('player.editor.hintBoth');
 
   return (
     <div className="stack entry-editor">
-      <h2>Your entry</h2>
-      <p className="muted">{hint}. It will be shown with your name.</p>
+      <h2>{t('player.editor.title')}</h2>
+      <p className="muted">{hint}</p>
 
       {allowImage && (
         <div className="image-picker">
           {preview ? (
             <div className="image-preview">
-              <img src={preview} alt="Your entry" />
+              <img src={preview} alt={t('player.editor.imageAlt')} />
               <button className="btn btn-small btn-ghost remove-image" onClick={clearImage}>
-                Remove image
+                {t('player.editor.removeImage')}
               </button>
             </div>
           ) : (
-            <div className="image-placeholder">{processing ? 'Processing…' : 'No image yet'}</div>
+            <div className="image-placeholder">{processing ? t('player.editor.processing') : t('player.editor.noImage')}</div>
           )}
           <div className="row">
             <button className="btn btn-secondary grow" disabled={processing} onClick={() => cameraRef.current?.click()}>
-              📷 Camera
+              {t('player.editor.camera')}
             </button>
             <button className="btn btn-secondary grow" disabled={processing} onClick={() => galleryRef.current?.click()}>
-              🖼️ Gallery
+              {t('player.editor.gallery')}
             </button>
           </div>
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
@@ -270,8 +276,14 @@ function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: (
 
       {allowText && (
         <label className="text-field">
-          {mode === 'text' ? 'Text' : 'Text (optional caption)'}
-          <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={MAX_TEXT_LENGTH} rows={3} placeholder="Type something…" />
+          {mode === 'text' ? t('player.editor.text') : t('player.editor.caption')}
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={MAX_TEXT_LENGTH}
+            rows={3}
+            placeholder={t('player.editor.textPlaceholder')}
+          />
           <span className="muted counter">
             {text.length}/{MAX_TEXT_LENGTH}
           </span>
@@ -279,16 +291,16 @@ function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: (
       )}
 
       <button className="btn btn-primary btn-big" disabled={!valid || uploading || processing} onClick={submit}>
-        {uploading ? 'Uploading…' : me.entry ? 'Save entry' : 'Submit entry'}
+        {uploading ? t('player.editor.uploading') : me.entry ? t('player.editor.save') : t('player.editor.submit')}
       </button>
       {me.submitted && (
         <button className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {t('player.editor.cancel')}
         </button>
       )}
       {!me.submitted && (
         <button className="btn btn-ghost" onClick={() => act('player:setRole', { role: 'voter' })}>
-          Actually, I'll just vote
+          {t('player.editor.justVote')}
         </button>
       )}
     </div>
@@ -298,28 +310,32 @@ function EntryEditor({ view, onDone, onError, act }: { view: RoomView; onDone: (
 // ------------------------------------------------------------------ in game
 
 function EntryStatusLine({ view }: { view: RoomView }) {
+  const { t } = useTranslation();
   const me = view.me!;
   if (!view.bracket) return null;
   const rounds = view.bracket.rounds.length;
   switch (me.entryStatus) {
     case 'alive':
-      return <div className="status-line ok">Your entry is still in the running 💪</div>;
+      return <div className="status-line ok">{t('player.status.alive')}</div>;
     case 'eliminated':
-      return <div className="status-line bad">Your entry was eliminated in the {roundName(me.eliminatedRound ?? 0, rounds)}.</div>;
+      return (
+        <div className="status-line bad">{t('player.status.eliminated', { round: roundLabel(t, me.eliminatedRound ?? 0, rounds) })}</div>
+      );
     case 'removed':
-      return <div className="status-line bad">Your entry was removed by the host.</div>;
+      return <div className="status-line bad">{t('player.status.removed')}</div>;
     case 'champion':
-      return <div className="status-line ok">Your entry won! 🏆</div>;
+      return <div className="status-line ok">{t('player.status.champion')}</div>;
     default:
       return null;
   }
 }
 
 function PlayerMatch({ view, act, serverNow }: { view: RoomView; act: Act; serverNow: () => number }) {
+  const { t } = useTranslation();
   useTick(250);
   const m = view.match;
   const me = view.me!;
-  if (!m) return <div className="center-card muted">Waiting for the next match…</div>;
+  if (!m) return <div className="center-card muted">{t('player.match.waiting')}</div>;
   const myEntry = me.entry?.id;
   const mySide = myEntry === m.a ? 'a' : myEntry === m.b ? 'b' : null;
   const voting = view.phase === 'voting';
@@ -329,16 +345,16 @@ function PlayerMatch({ view, act, serverNow }: { view: RoomView; act: Act; serve
 
   let banner: React.ReactNode = null;
   if (view.phase === 'reveal') {
-    if (mySide && m.winner === mySide) banner = <div className="banner banner-ok big">Your entry advances! 🎉</div>;
-    else if (mySide) banner = <div className="banner banner-bad big">You've been eliminated 😢</div>;
-    else if (me.vote === m.winner && me.vote) banner = <div className="banner banner-ok">Your pick won!</div>;
-    else banner = <div className="banner">{view.entries[m.winner === 'a' ? m.a : m.b]?.ownerName} wins!</div>;
+    if (mySide && m.winner === mySide) banner = <div className="banner banner-ok big">{t('player.match.advances')}</div>;
+    else if (mySide) banner = <div className="banner banner-bad big">{t('player.match.eliminated')}</div>;
+    else if (me.vote === m.winner && me.vote) banner = <div className="banner banner-ok">{t('player.match.pickWon')}</div>;
+    else banner = <div className="banner">{t('player.match.wins', { name: view.entries[m.winner === 'a' ? m.a : m.b]?.ownerName })}</div>;
   } else if (view.phase === 'tiebreak') {
-    banner = <div className="banner banner-warn">It's a tie! The host is deciding…</div>;
+    banner = <div className="banner banner-warn">{t('player.match.tieDeciding')}</div>;
   } else if (mySide) {
-    banner = <div className="banner banner-hot">Your entry is up! 🔥</div>;
+    banner = <div className="banner banner-hot">{t('player.match.yourEntryUp')}</div>;
   } else if (m.suddenDeath) {
-    banner = <div className="banner banner-hot">Sudden death! Vote again!</div>;
+    banner = <div className="banner banner-hot">{t('player.match.suddenDeath')}</div>;
   }
 
   const vote = (side: 'a' | 'b') => {
@@ -348,19 +364,20 @@ function PlayerMatch({ view, act, serverNow }: { view: RoomView; act: Act; serve
   };
 
   const sideClass = (side: 'a' | 'b') => (view.phase === 'reveal' ? (m.winner === side ? 'winner' : 'loser') : '');
+  const hint = me.voteBlocked
+    ? t(`player.match.blocked.${me.voteBlocked}`)
+    : me.vote
+      ? t('player.match.voteSaved')
+      : t('player.match.tapFavourite');
 
   return (
     <div className="stack match-phone">
       <div className="match-phone-head">
-        <span className="round-name">{m.roundName}</span>
+        <span className="round-name">{roundLabel(t, m.round, view.bracket!.rounds.length)}</span>
         {voting && <Countdown ms={ms} totalMs={total} paused={view.paused} size="small" />}
       </div>
       {banner}
-      {voting && (
-        <p className="vote-hint">
-          {me.voteBlockedReason ?? (me.vote ? 'Vote saved, tap the other one to change it.' : 'Tap your favourite!')}
-        </p>
-      )}
+      {voting && <p className="vote-hint">{hint}</p>}
       <div className="phone-versus">
         {(['a', 'b'] as const).map((side) => (
           <EntryCard
@@ -371,22 +388,19 @@ function PlayerMatch({ view, act, serverNow }: { view: RoomView; act: Act; serve
             disabled={!me.canVote}
             selected={me.vote === side}
             className={sideClass(side)}
-            badge={me.vote === side ? '✓ Your vote' : mySide === side ? 'You' : undefined}
+            badge={me.vote === side ? t('player.match.yourVote') : mySide === side ? t('player.match.you') : undefined}
           />
         ))}
       </div>
       {showCounts && m.decidedBy !== 'forfeit' && <VoteBar a={m.votesA!} b={m.votesB!} winner={m.winner} />}
-      {voting && (
-        <p className="muted center">
-          {m.votedCount}/{m.eligibleCount} voted
-        </p>
-      )}
+      {voting && <p className="muted center">{t('player.match.voted', { voted: m.votedCount, eligible: m.eligibleCount })}</p>}
       <EntryStatusLine view={view} />
     </div>
   );
 }
 
 function PlayerOverview({ view }: { view: RoomView }) {
+  const { t } = useTranslation();
   const me = view.me!;
   const next = view.nextMatchId ? view.bracket?.rounds.flat().find((m) => m.id === view.nextMatchId) : null;
   const mine = !!next && !!me.entry && (next.a === me.entry.id || next.b === me.entry.id);
@@ -394,13 +408,13 @@ function PlayerOverview({ view }: { view: RoomView }) {
     <div className="stack">
       <div className="status-card">
         <div className="status-emoji">{mine ? '🔥' : '⏳'}</div>
-        <h2>{mine ? 'Your entry is up next!' : 'Waiting for the next match'}</h2>
+        <h2>{mine ? t('player.overview.upNextYou') : t('player.overview.waiting')}</h2>
         {next?.a && next.b && (
           <p className="muted">
-            {view.entries[next.a]?.ownerName} vs {view.entries[next.b]?.ownerName}
+            {t('player.overview.versus', { a: view.entries[next.a]?.ownerName, b: view.entries[next.b]?.ownerName })}
           </p>
         )}
-        {view.paused && <p className="muted">The host paused the game.</p>}
+        {view.paused && <p className="muted">{t('player.overview.paused')}</p>}
       </div>
       <EntryStatusLine view={view} />
     </div>
@@ -408,16 +422,19 @@ function PlayerOverview({ view }: { view: RoomView }) {
 }
 
 function PlayerFinished({ view }: { view: RoomView }) {
+  const { t } = useTranslation();
   const champ = view.champion ? view.entries[view.champion] : undefined;
   const mine = view.me!.entryStatus === 'champion';
   return (
     <div className="stack">
       <div className="status-card">
         <div className="status-emoji">🏆</div>
-        <h2>{mine ? 'You won the bracket!' : champ ? `${champ.ownerName} is the champion!` : 'Game over'}</h2>
+        <h2>
+          {mine ? t('player.finished.youWon') : champ ? t('player.finished.champion', { name: champ.ownerName }) : t('player.finished.gameOver')}
+        </h2>
       </div>
       {champ && <EntryCard entry={champ} className="preview" />}
-      <p className="muted center">Waiting for the host to start another round…</p>
+      <p className="muted center">{t('player.finished.waiting')}</p>
     </div>
   );
 }

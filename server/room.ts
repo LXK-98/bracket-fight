@@ -10,12 +10,12 @@ import {
   recordResult,
   removeEntry as bracketRemoveEntry,
   resolveVotes,
-  roundName,
   type Bracket,
   type DecidedBy,
   type Rng,
   type Side,
 } from '../shared/bracket';
+import { problem, type MessageCode, type MessageParams } from '../shared/messages';
 import { sanitizeName, sanitizeText } from '../shared/sanitize';
 import {
   DEFAULT_SETTINGS,
@@ -29,14 +29,22 @@ import {
   type MeView,
   type Phase,
   type PublicEntry,
+  type Problem,
   type PublicPlayer,
   type Role,
   type RoomView,
   type Settings,
 } from '../shared/types';
 
-/** An error whose message is safe to show to the user. */
-export class GameError extends Error {}
+/** An error meant for the user: `code` + `params` are translated by the client, `message` is English. */
+export class GameError extends Error {
+  constructor(
+    readonly code: MessageCode,
+    readonly params?: MessageParams,
+  ) {
+    super(problem(code, params).message);
+  }
+}
 
 export interface PlayerState {
   id: string;
@@ -131,12 +139,12 @@ export class Room {
 
   private player(playerId: string): PlayerState {
     const p = this.players.get(playerId);
-    if (!p) throw new GameError('You are no longer in this room.');
+    if (!p) throw new GameError('notInRoom');
     return p;
   }
 
   private requireLobby() {
-    if (this.phase !== 'lobby') throw new GameError('The game has already started.');
+    if (this.phase !== 'lobby') throw new GameError('gameStarted');
   }
 
   private deleteEntry(entryId: string | null) {
@@ -202,11 +210,11 @@ export class Room {
 
   join(rawName: unknown): PlayerState {
     const name = sanitizeName(rawName);
-    if (!name) throw new GameError('Please enter a name.');
-    if (this.players.size >= this.deps.maxPlayers) throw new GameError('This room is full.');
+    if (!name) throw new GameError('nameRequired');
+    if (this.players.size >= this.deps.maxPlayers) throw new GameError('roomFull');
     const lower = name.toLocaleLowerCase();
     for (const p of this.players.values()) {
-      if (p.name.toLocaleLowerCase() === lower) throw new GameError('That name is already taken in this room.');
+      if (p.name.toLocaleLowerCase() === lower) throw new GameError('nameTaken');
     }
     const player: PlayerState = {
       id: id(),
@@ -246,10 +254,10 @@ export class Room {
   setRole(playerId: string, role: unknown) {
     this.requireLobby();
     const p = this.player(playerId);
-    if (role !== 'competitor' && role !== 'voter') throw new GameError('Invalid role.');
+    if (role !== 'competitor' && role !== 'voter') throw new GameError('invalidRequest');
     if (role === p.role) return;
     if (role === 'competitor' && this.competitors().length >= this.maxEntries) {
-      throw new GameError(`The bracket is full (${this.maxEntries} entries). You can still vote!`);
+      throw new GameError('bracketFull', { max: this.maxEntries });
     }
     if (role === 'voter') this.deleteEntry(p.entryId);
     p.role = role;
@@ -264,9 +272,9 @@ export class Room {
     try {
       this.requireLobby();
       const p = this.player(playerId);
-      if (p.role !== 'competitor') throw new GameError('Choose "Compete" before submitting an entry.');
+      if (p.role !== 'competitor') throw new GameError('notCompetitor');
       const mode = this.settings.entryMode;
-      if (mode === 'text' && input.imageFile) throw new GameError('This room only allows text entries.');
+      if (mode === 'text' && input.imageFile) throw new GameError('textOnly');
       const text = mode === 'image' ? null : sanitizeText(input.text);
 
       const existing = p.entryId ? this.entries.get(p.entryId) : undefined;
@@ -282,9 +290,7 @@ export class Room {
         imageFile,
       };
       if (!entryValid(draft, mode)) {
-        throw new GameError(
-          mode === 'image' ? 'Please add an image.' : mode === 'text' ? 'Please enter some text.' : 'Add an image or some text.',
-        );
+        throw new GameError(mode === 'image' ? 'imageRequired' : mode === 'text' ? 'textRequired' : 'entryEmpty');
       }
       if (existing?.imageFile && existing.imageFile !== imageFile) this.deps.onDeleteFile(this, existing.imageFile);
       this.entries.set(draft.id, draft);
@@ -315,22 +321,22 @@ export class Room {
     this.requireLobby();
     const s = { ...this.settings };
     if (patch.maxEntries !== undefined) {
-      if (![4, 8, 16, 32, 'auto'].includes(patch.maxEntries as never)) throw new GameError('Invalid bracket size.');
+      if (![4, 8, 16, 32, 'auto'].includes(patch.maxEntries as never)) throw new GameError('invalidRequest');
       s.maxEntries = patch.maxEntries as Settings['maxEntries'];
     }
     if (patch.voteSeconds !== undefined) {
       const v = Math.round(Number(patch.voteSeconds));
-      if (!Number.isFinite(v)) throw new GameError('Invalid vote timer.');
+      if (!Number.isFinite(v)) throw new GameError('invalidRequest');
       s.voteSeconds = Math.min(MAX_VOTE_SECONDS, Math.max(MIN_VOTE_SECONDS, v));
     }
     if (patch.entryMode !== undefined) {
-      if (!['image', 'text', 'imageOrText'].includes(patch.entryMode as string)) throw new GameError('Invalid entry type.');
+      if (!['image', 'text', 'imageOrText'].includes(patch.entryMode as string)) throw new GameError('invalidRequest');
       s.entryMode = patch.entryMode as EntryMode;
     }
     if (patch.showLiveVotes !== undefined) s.showLiveVotes = Boolean(patch.showLiveVotes);
     if (patch.allowSelfVote !== undefined) s.allowSelfVote = Boolean(patch.allowSelfVote);
     if (patch.tieBreak !== undefined) {
-      if (!['random', 'host', 'suddenDeath'].includes(patch.tieBreak as string)) throw new GameError('Invalid tie-break.');
+      if (!['random', 'host', 'suddenDeath'].includes(patch.tieBreak as string)) throw new GameError('invalidRequest');
       s.tieBreak = patch.tieBreak as Settings['tieBreak'];
     }
     this.settings = s;
@@ -343,21 +349,18 @@ export class Room {
     const submitted = competitors.filter((p) => entryValid(this.entries.get(p.entryId ?? ''), this.settings.entryMode)).length;
     const max = this.maxEntries;
     const bracketSize = bracketSizeFor(Math.max(count, 2), max);
-    let reason: string | null = null;
-    if (count < 2) reason = `Need at least 2 competitors (${count} so far).`;
-    else if (count > max) reason = `Too many competitors (${count}) for a bracket of ${max}. Raise the max or ask someone to just vote.`;
-    else if (submitted < count) {
-      const waiting = count - submitted;
-      reason = `Waiting for ${waiting} competitor${waiting === 1 ? '' : 's'} to submit an entry.`;
-    }
+    let blocked: Problem | null = null;
+    if (count < 2) blocked = problem('needTwoCompetitors', { current: count });
+    else if (count > max) blocked = problem('tooManyCompetitors', { current: count, max });
+    else if (submitted < count) blocked = problem('waitingForEntries', { count: count - submitted });
     return {
       competitorCount: count,
       submittedCount: submitted,
       maxEntries: max,
       bracketSize,
       byes: count >= 2 && count <= max ? bracketSize - count : 0,
-      canStart: reason === null,
-      startBlockedReason: reason,
+      canStart: blocked === null,
+      startBlocked: blocked,
       competitorsFull: count >= max,
     };
   }
@@ -365,7 +368,7 @@ export class Room {
   start() {
     this.requireLobby();
     const info = this.lobbyInfo();
-    if (!info.canStart) throw new GameError(info.startBlockedReason ?? 'Cannot start yet.');
+    if (info.startBlocked) throw new GameError(info.startBlocked.code, info.startBlocked.params);
     for (const p of this.players.values()) if (p.role === 'undecided') p.role = 'voter';
     const entryIds = this.competitors().map((p) => p.entryId!);
     this.bracket = createBracket(entryIds, this.deps.rng);
@@ -445,7 +448,7 @@ export class Room {
   }
 
   pause() {
-    if (this.paused || !this.timer || this.phaseEndsAt === null) throw new GameError('Nothing to pause.');
+    if (this.paused || !this.timer || this.phaseEndsAt === null) throw new GameError('nothingToPause');
     const remaining = Math.max(0, this.phaseEndsAt - this.deps.now());
     const fn = this.timerFn!;
     this.clearTimer();
@@ -455,7 +458,7 @@ export class Room {
   }
 
   resume() {
-    if (!this.paused || !this.timerFn) throw new GameError('The game is not paused.');
+    if (!this.paused || !this.timerFn) throw new GameError('notPaused');
     this.setTimer(this.pausedRemainingMs!, this.timerFn);
     this.checkAllVoted();
     this.changed();
@@ -463,7 +466,7 @@ export class Room {
 
   /** End the vote timer now. */
   skipTimer() {
-    if (this.phase !== 'voting') throw new GameError('No vote is running.');
+    if (this.phase !== 'voting') throw new GameError('noVoteRunning');
     this.endVoting();
   }
 
@@ -477,28 +480,28 @@ export class Room {
       case 'overview':
         return this.startMatch(this.nextMatchId!);
       case 'tiebreak':
-        throw new GameError('Pick a winner to break the tie.');
+        throw new GameError('pickWinner');
       default:
-        throw new GameError('Nothing to advance.');
+        throw new GameError('nothingToAdvance');
     }
   }
 
   pickWinner(side: unknown) {
-    if (this.phase !== 'tiebreak') throw new GameError('There is no tie to break.');
-    if (side !== 'a' && side !== 'b') throw new GameError('Invalid side.');
+    if (this.phase !== 'tiebreak') throw new GameError('noTie');
+    if (side !== 'a' && side !== 'b') throw new GameError('invalidRequest');
     const { a, b } = this.tally();
     this.finishMatch(side, 'host', a, b);
   }
 
   /** Host moderation: in the lobby the entry is deleted; mid-game its opponent advances. */
   removeEntry(entryId: unknown) {
-    if (typeof entryId !== 'string' || !this.entries.has(entryId)) throw new GameError('Unknown entry.');
+    if (typeof entryId !== 'string' || !this.entries.has(entryId)) throw new GameError('unknownEntry');
     if (this.phase === 'lobby') {
       this.deleteEntry(entryId);
       this.changed();
       return;
     }
-    if (this.phase === 'finished' || !this.bracket) throw new GameError('The game is over.');
+    if (this.phase === 'finished' || !this.bracket) throw new GameError('gameOver');
     this.bracket = bracketRemoveEntry(this.bracket, entryId);
     const current = this.currentMatch();
     if ((this.phase === 'voting' || this.phase === 'tiebreak') && current?.winner) {
@@ -540,10 +543,10 @@ export class Room {
 
   vote(playerId: string, matchId: unknown, side: unknown) {
     const p = this.player(playerId);
-    if (this.phase !== 'voting' || matchId !== this.currentMatchId) throw new GameError('Voting for this matchup is closed.');
-    if (this.paused) throw new GameError('The game is paused.');
-    if (side !== 'a' && side !== 'b') throw new GameError('Invalid vote.');
-    if (!this.canVote(p)) throw new GameError("You can't vote in your own matchup.");
+    if (this.phase !== 'voting' || matchId !== this.currentMatchId) throw new GameError('votingClosed');
+    if (this.paused) throw new GameError('gamePaused');
+    if (side !== 'a' && side !== 'b') throw new GameError('invalidRequest');
+    if (!this.canVote(p)) throw new GameError('ownMatchup');
     this.votes.set(p.id, side);
     this.checkAllVoted();
     this.changed();
@@ -601,7 +604,6 @@ export class Room {
       match = {
         matchId: m.id,
         round: m.round,
-        roundName: roundName(m.round, this.bracket!.rounds.length),
         a: m.a,
         b: m.b,
         suddenDeath: this.suddenDeath,
@@ -618,10 +620,10 @@ export class Room {
     if (me) {
       const inBracket = !!this.bracket && !!myEntry && this.bracket.rounds[0].some((x) => x.a === myEntry.id || x.b === myEntry.id);
       const status = inBracket ? entryStatus(this.bracket!, myEntry!.id) : null;
-      let blocked: string | null = null;
+      let blocked: MeView['voteBlocked'] = null;
       if (this.phase === 'voting') {
-        if (!this.canVote(me)) blocked = "You can't vote in your own matchup.";
-        else if (this.paused) blocked = 'Paused';
+        if (!this.canVote(me)) blocked = 'ownMatchup';
+        else if (this.paused) blocked = 'paused';
       }
       meView = {
         id: me.id,
@@ -631,7 +633,7 @@ export class Room {
         submitted: me.role === 'competitor' && entryValid(myEntry, mode),
         vote: this.phase === 'voting' || this.phase === 'tiebreak' || this.phase === 'reveal' ? (this.votes.get(me.id) ?? null) : null,
         canVote: this.phase === 'voting' && blocked === null,
-        voteBlockedReason: blocked,
+        voteBlocked: blocked,
         entryStatus: status ? status.state : 'none',
         eliminatedRound: status?.state === 'eliminated' ? status.round : null,
       };

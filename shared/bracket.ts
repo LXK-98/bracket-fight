@@ -235,12 +235,15 @@ export function entryStatus(b: Bracket, entryId: string): EntryStatus {
   return { state: 'alive' };
 }
 
-export function roundName(round: number, roundCount: number): string {
+export type RoundKind = 'final' | 'semifinals' | 'quarterfinals' | 'round';
+
+/** How a round is named: the last three rounds have names, earlier ones are numbered (round + 1). */
+export function roundKind(round: number, roundCount: number): RoundKind {
   const fromEnd = roundCount - round;
-  if (fromEnd === 1) return 'Final';
-  if (fromEnd === 2) return 'Semifinals';
-  if (fromEnd === 3) return 'Quarterfinals';
-  return `Round ${round + 1}`;
+  if (fromEnd === 1) return 'final';
+  if (fromEnd === 2) return 'semifinals';
+  if (fromEnd === 3) return 'quarterfinals';
+  return 'round';
 }
 
 export type TieAction = { kind: 'revote' } | { kind: 'host' } | { kind: 'winner'; side: Side };

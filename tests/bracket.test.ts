@@ -10,7 +10,7 @@ import {
   recordResult,
   removeEntry,
   resolveVotes,
-  roundName,
+  roundKind,
   seedOrder,
   type Bracket,
   type Rng,
@@ -197,10 +197,12 @@ describe('match flow', () => {
   });
 
   it('names rounds', () => {
-    expect(roundName(0, 5)).toBe('Round 1');
-    expect(roundName(2, 5)).toBe('Quarterfinals');
-    expect(roundName(3, 5)).toBe('Semifinals');
-    expect(roundName(4, 5)).toBe('Final');
+    expect(roundKind(0, 5)).toBe('round');
+    expect(roundKind(1, 5)).toBe('round');
+    expect(roundKind(2, 5)).toBe('quarterfinals');
+    expect(roundKind(3, 5)).toBe('semifinals');
+    expect(roundKind(4, 5)).toBe('final');
+    expect(roundKind(0, 1)).toBe('final');
   });
 });
 

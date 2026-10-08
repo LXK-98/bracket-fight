@@ -1,6 +1,16 @@
+import type { MessageParams } from '../../../shared/messages';
+import { CodedError } from '../i18n/text';
+
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    const err = body as { error?: string; code?: string; params?: MessageParams };
+    throw new CodedError(
+      err.code
+        ? { code: err.code, params: err.params, message: err.error }
+        : { code: 'requestFailed', params: { status: res.status }, message: err.error },
+    );
+  }
   return body as T;
 }
 

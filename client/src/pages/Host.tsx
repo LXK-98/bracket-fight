@@ -1,37 +1,52 @@
+import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { allMatches } from '../../../shared/bracket';
 import {
+  AUTO_MAX_ENTRIES,
   MAX_VOTE_SECONDS,
   MIN_VOTE_SECONDS,
   SUDDEN_DEATH_SECONDS,
+  type DecidedBy,
   type RoomView,
   type Settings,
 } from '../../../shared/types';
 import { BracketView } from '../components/Bracket';
 import { Countdown } from '../components/Countdown';
 import { EntryCard } from '../components/EntryCard';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { VoteBar } from '../components/VoteBar';
+import { problemText, roundLabel, tNodes, toProblem, type Problem } from '../i18n/text';
 import { api } from '../lib/api';
 import { sound } from '../lib/sound';
-import { remainingMs, useRoom, useTick } from '../lib/useRoom';
+import { ackProblem, remainingMs, useRoom, useTick } from '../lib/useRoom';
 
-const DECIDED_BY_LABEL: Record<string, string> = {
-  votes: '',
-  suddenDeath: 'Won in sudden death',
-  random: 'Tie broken at random',
-  host: 'Tie broken by the host',
-  forfeit: 'Opponent removed: advances automatically',
-};
+type Act = (event: string, payload?: object) => Promise<boolean>;
 
-function matchProgress(view: RoomView, matchId: string | null) {
+function decidedByText(t: TFunction, decidedBy: DecidedBy | null): string | null {
+  switch (decidedBy) {
+    case 'suddenDeath':
+      return t('host.match.decidedBy.suddenDeath');
+    case 'random':
+      return t('host.match.decidedBy.random');
+    case 'host':
+      return t('host.match.decidedBy.host');
+    case 'forfeit':
+      return t('host.match.decidedBy.forfeit');
+    default:
+      return null;
+  }
+}
+
+function matchProgress(t: TFunction, view: RoomView, matchId: string | null) {
   if (!view.bracket || !matchId) return null;
   const playable = allMatches(view.bracket).filter((m) => !m.bye);
   const idx = playable.findIndex((m) => m.id === matchId);
-  return idx >= 0 ? `Match ${idx + 1} of ${playable.length}` : null;
+  return idx >= 0 ? t('host.match.progress', { current: idx + 1, total: playable.length }) : null;
 }
 
 function useToast() {
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<Problem | null>(null);
   useEffect(() => {
     if (!msg) return;
     const t = setTimeout(() => setMsg(null), 4000);
@@ -75,6 +90,7 @@ function useHostSounds(view: RoomView | null, serverNow: () => number) {
 }
 
 export function HostPage({ code }: { code: string }) {
+  const { t } = useTranslation();
   const conn = useRoom(code, 'host');
   const { view, fatal, connected, emit, serverNow } = conn;
   const [toast, setToast] = useToast();
@@ -82,16 +98,16 @@ export function HostPage({ code }: { code: string }) {
   const [soundOn, setSoundOn] = useState(sound.enabled);
   useHostSounds(view, serverNow);
 
-  const act = async (event: string, payload?: object) => {
+  const act: Act = async (event, payload) => {
     sound.unlock();
     const res = await emit(event, payload);
-    if (!res.ok) setToast(res.error);
+    if (!res.ok) setToast(ackProblem(res));
     return res.ok;
   };
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
-    else void document.documentElement.requestFullscreen?.().catch(() => setToast('Fullscreen is not available here.'));
+    else void document.documentElement.requestFullscreen?.().catch(() => setToast({ code: 'fullscreenUnavailable' }));
   };
 
   // Keyboard shortcuts for laptops: F fullscreen, Space pause/resume, N next.
@@ -113,14 +129,14 @@ export function HostPage({ code }: { code: string }) {
   if (fatal) {
     return (
       <main className="center-screen">
-        <h1>{fatal}</h1>
+        <h1>{problemText(t, fatal)}</h1>
         <a className="btn btn-primary btn-big" href="/">
-          Back to start
+          {t('common.backToStart')}
         </a>
       </main>
     );
   }
-  if (!view) return <main className="center-screen">Connecting…</main>;
+  if (!view) return <main className="center-screen">{t('common.connecting')}</main>;
 
   const inGame = view.phase !== 'lobby';
 
@@ -131,16 +147,13 @@ export function HostPage({ code }: { code: string }) {
           <span className="logo small">
             <span className="logo-a">Image</span> <span className="logo-b">Bracket</span>
           </span>
-          {inGame && (
-            <span className="host-code">
-              Join: <b>{view.code}</b>
-            </span>
-          )}
-          {!connected && <span className="pill pill-warn">Reconnecting…</span>}
+          {inGame && <span className="host-code">{tNodes(t, 'host.join', { code: <b>{view.code}</b> })}</span>}
+          {!connected && <span className="pill pill-warn">{t('common.reconnecting')}</span>}
         </div>
         <div className="host-bar-right">
+          <LanguageSwitcher />
           <button className="btn btn-ghost" onClick={() => setManage(true)}>
-            Players ({view.players.length})
+            {t('host.players', { count: view.players.length })}
           </button>
           <button
             className="btn btn-ghost"
@@ -149,11 +162,11 @@ export function HostPage({ code }: { code: string }) {
               setSoundOn(!soundOn);
             }}
             aria-pressed={soundOn}
-            title="Toggle sound effects"
+            title={t('host.toggleSound')}
           >
             {soundOn ? '🔊' : '🔇'}
           </button>
-          <button className="btn btn-ghost" onClick={toggleFullscreen} title="Full screen (F)">
+          <button className="btn btn-ghost" onClick={toggleFullscreen} title={t('host.fullscreen')}>
             ⛶
           </button>
         </div>
@@ -170,30 +183,22 @@ export function HostPage({ code }: { code: string }) {
 
       {inGame && <HostControls view={view} act={act} />}
       {manage && <ManageDialog view={view} act={act} onClose={() => setManage(false)} />}
-      {toast && <div className="toast">{toast}</div>}
+      {toast && <div className="toast">{problemText(t, toast)}</div>}
     </div>
   );
 }
 
 // ------------------------------------------------------------------ lobby
 
-function Lobby({
-  view,
-  act,
-  onError,
-}: {
-  view: RoomView;
-  act: (e: string, p?: object) => Promise<boolean>;
-  onError: (m: string) => void;
-}) {
+function Lobby({ view, act, onError }: { view: RoomView; act: Act; onError: (p: Problem) => void }) {
+  const { t } = useTranslation();
   const [info, setInfo] = useState<{ joinUrl: string; qrSvg: string } | null>(null);
   useEffect(() => {
-    api.joinInfo(view.code).then(setInfo, (e) => onError(e.message));
+    api.joinInfo(view.code).then(setInfo, (e) => onError(toProblem(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.code]);
 
   const { lobby } = view;
-  const roleLabel = { undecided: 'Choosing…', competitor: 'Competing', voter: 'Voting' } as const;
   const sorted = [...view.players].sort((a, b) => {
     const order = { competitor: 0, voter: 1, undecided: 2 };
     return order[a.role] - order[b.role];
@@ -202,28 +207,32 @@ function Lobby({
   return (
     <div className="lobby">
       <section className="lobby-join">
-        <div className="join-steps">Scan to join, or go to</div>
+        <div className="join-steps">{t('host.lobby.scanToJoin')}</div>
         <div className="join-url">{info ? info.joinUrl.replace(/^https?:\/\//, '').replace(/\/join\/.*$/, '') : '…'}</div>
-        <div className="qr" dangerouslySetInnerHTML={info ? { __html: info.qrSvg } : undefined} aria-label="QR code to join" />
-        <div className="room-code-label">Room code</div>
+        <div className="qr" dangerouslySetInnerHTML={info ? { __html: info.qrSvg } : undefined} aria-label={t('host.lobby.qrLabel')} />
+        <div className="room-code-label">{t('host.lobby.roomCode')}</div>
         <div className="room-code">{view.code}</div>
       </section>
 
       <section className="lobby-side">
         <div className="lobby-players">
           <h2>
-            Players <span className="muted">{view.players.length}</span>
+            {t('host.lobby.players')} <span className="muted">{view.players.length}</span>
           </h2>
-          {view.players.length === 0 && <p className="muted big-hint">Waiting for players to join…</p>}
+          {view.players.length === 0 && <p className="muted big-hint">{t('host.lobby.waitingForPlayers')}</p>}
           <ul className="player-grid">
             {sorted.map((p) => (
               <li key={p.id} className={`player-chip role-${p.role} ${p.connected ? '' : 'offline'}`}>
                 <span className="player-name">{p.name}</span>
                 <span className="player-role">
-                  {roleLabel[p.role]}
+                  {t(`roles.${p.role}`)}
                   {p.role === 'competitor' && (p.submitted ? ' ✓' : ' ⏳')}
                 </span>
-                <button className="kick" title={`Kick ${p.name}`} onClick={() => confirm(`Kick ${p.name}?`) && act('host:kick', { playerId: p.id })}>
+                <button
+                  className="kick"
+                  title={t('host.lobby.kick', { name: p.name })}
+                  onClick={() => confirm(t('host.lobby.kickConfirm', { name: p.name })) && act('host:kick', { playerId: p.id })}
+                >
                   ×
                 </button>
               </li>
@@ -233,29 +242,27 @@ function Lobby({
 
         <div className="lobby-status">
           <div className="stat">
-            <b>
-              {lobby.submittedCount}/{lobby.competitorCount}
-            </b>{' '}
-            entries submitted
+            {tNodes(t, 'host.lobby.submitted', {
+              submitted: (
+                <b>
+                  {lobby.submittedCount}/{lobby.competitorCount}
+                </b>
+              ),
+            })}
           </div>
           {lobby.competitorCount >= 2 && lobby.competitorCount <= lobby.maxEntries && (
             <div className="stat">
-              Bracket of <b>{lobby.bracketSize}</b>
-              {lobby.byes > 0 && (
-                <>
-                  {' '}
-                  · <b>{lobby.byes}</b> bye{lobby.byes === 1 ? '' : 's'}
-                </>
-              )}
+              {tNodes(t, 'host.lobby.bracketSize', { size: <b>{lobby.bracketSize}</b> })}
+              {lobby.byes > 0 && <> · {tNodes(t, 'host.lobby.byes', { n: <b>{lobby.byes}</b> }, { count: lobby.byes })}</>}
             </div>
           )}
-          {lobby.competitorsFull && <div className="stat warn">Bracket full: new players can only vote</div>}
+          {lobby.competitorsFull && <div className="stat warn">{t('host.lobby.bracketFull')}</div>}
         </div>
 
         <button className="btn btn-primary btn-huge" disabled={!lobby.canStart} onClick={() => act('host:start')}>
-          Start game
+          {t('host.lobby.start')}
         </button>
-        {lobby.startBlockedReason && <p className="start-reason">{lobby.startBlockedReason}</p>}
+        {lobby.startBlocked && <p className="start-reason">{problemText(t, lobby.startBlocked)}</p>}
 
         <SettingsPanel settings={view.settings} act={act} />
       </section>
@@ -263,22 +270,23 @@ function Lobby({
   );
 }
 
-function SettingsPanel({ settings, act }: { settings: Settings; act: (e: string, p?: object) => Promise<boolean> }) {
+function SettingsPanel({ settings, act }: { settings: Settings; act: Act }) {
+  const { t } = useTranslation();
   const set = (patch: Partial<Settings>) => act('host:settings', patch);
   const timerOptions = [...new Set([10, 15, 20, 30, 45, 60, 90, 120, settings.voteSeconds])]
     .filter((s) => s >= MIN_VOTE_SECONDS && s <= MAX_VOTE_SECONDS)
     .sort((a, b) => a - b);
   return (
     <details className="settings" open>
-      <summary>Settings</summary>
+      <summary>{t('host.settings.title')}</summary>
       <div className="settings-grid">
         <label>
-          Max entries
+          {t('host.settings.maxEntries')}
           <select
             value={String(settings.maxEntries)}
             onChange={(e) => set({ maxEntries: e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as Settings['maxEntries']) })}
           >
-            <option value="auto">Auto (up to 32)</option>
+            <option value="auto">{t('host.settings.auto', { max: AUTO_MAX_ENTRIES })}</option>
             {[4, 8, 16, 32].map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -287,38 +295,38 @@ function SettingsPanel({ settings, act }: { settings: Settings; act: (e: string,
           </select>
         </label>
         <label>
-          Vote timer
+          {t('host.settings.voteTimer')}
           <select value={settings.voteSeconds} onChange={(e) => set({ voteSeconds: Number(e.target.value) })}>
             {timerOptions.map((s) => (
               <option key={s} value={s}>
-                {s} seconds
+                {t('host.settings.seconds', { count: s })}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Entries
+          {t('host.settings.entries')}
           <select value={settings.entryMode} onChange={(e) => set({ entryMode: e.target.value as Settings['entryMode'] })}>
-            <option value="imageOrText">Image and/or text</option>
-            <option value="image">Image only</option>
-            <option value="text">Text only</option>
+            <option value="imageOrText">{t('host.settings.imageOrText')}</option>
+            <option value="image">{t('host.settings.imageOnly')}</option>
+            <option value="text">{t('host.settings.textOnly')}</option>
           </select>
         </label>
         <label>
-          Ties
+          {t('host.settings.ties')}
           <select value={settings.tieBreak} onChange={(e) => set({ tieBreak: e.target.value as Settings['tieBreak'] })}>
-            <option value="suddenDeath">{SUDDEN_DEATH_SECONDS}s sudden death, then random</option>
-            <option value="random">Random</option>
-            <option value="host">Host decides</option>
+            <option value="suddenDeath">{t('host.settings.suddenDeath', { seconds: SUDDEN_DEATH_SECONDS })}</option>
+            <option value="random">{t('host.settings.random')}</option>
+            <option value="host">{t('host.settings.hostDecides')}</option>
           </select>
         </label>
         <label className="check">
           <input type="checkbox" checked={settings.showLiveVotes} onChange={(e) => set({ showLiveVotes: e.target.checked })} />
-          Show live vote counts
+          {t('host.settings.showLiveVotes')}
         </label>
         <label className="check">
           <input type="checkbox" checked={settings.allowSelfVote} onChange={(e) => set({ allowSelfVote: e.target.checked })} />
-          Contestants may vote in their own matchup
+          {t('host.settings.allowSelfVote')}
         </label>
       </div>
     </details>
@@ -327,15 +335,8 @@ function SettingsPanel({ settings, act }: { settings: Settings; act: (e: string,
 
 // ------------------------------------------------------------------ match
 
-function MatchScreen({
-  view,
-  serverNow,
-  act,
-}: {
-  view: RoomView;
-  serverNow: () => number;
-  act: (e: string, p?: object) => Promise<boolean>;
-}) {
+function MatchScreen({ view, serverNow, act }: { view: RoomView; serverNow: () => number; act: Act }) {
+  const { t } = useTranslation();
   useTick(200);
   const m = view.match;
   if (!m) return null;
@@ -347,54 +348,59 @@ function MatchScreen({
   const total = (m.suddenDeath ? SUDDEN_DEATH_SECONDS : view.settings.voteSeconds) * 1000;
   const showCounts = m.votesA !== null && m.votesB !== null;
   const cardClass = (side: 'a' | 'b') => (reveal ? (m.winner === side ? 'winner' : 'loser') : '');
+  const decidedBy = reveal ? decidedByText(t, m.decidedBy) : null;
+  const card = (side: 'a' | 'b') => (
+    <EntryCard
+      entry={side === 'a' ? ea : eb}
+      side={side}
+      className={`big ${cardClass(side)}`}
+      badge={reveal && m.winner === side ? t('host.match.winner') : undefined}
+    >
+      {tie && (
+        <button className="btn btn-primary pick" onClick={() => act('host:pickWinner', { side })}>
+          {t('host.match.pickThis')}
+        </button>
+      )}
+    </EntryCard>
+  );
 
   return (
     <div className="match-screen">
       <div className="match-head">
-        <h2>{m.roundName}</h2>
-        <span className="muted">{matchProgress(view, m.matchId)}</span>
-        {m.suddenDeath && view.phase === 'voting' && <span className="pill pill-hot">Sudden death!</span>}
+        <h2>{roundLabel(t, m.round, view.bracket!.rounds.length)}</h2>
+        <span className="muted">{matchProgress(t, view, m.matchId)}</span>
+        {m.suddenDeath && view.phase === 'voting' && <span className="pill pill-hot">{t('host.match.suddenDeath')}</span>}
       </div>
 
       <div className="versus">
-        <EntryCard entry={ea} side="a" className={`big ${cardClass('a')}`} badge={reveal && m.winner === 'a' ? 'WINNER' : undefined}>
-          {tie && (
-            <button className="btn btn-primary pick" onClick={() => act('host:pickWinner', { side: 'a' })}>
-              Pick this one
-            </button>
-          )}
-        </EntryCard>
+        {card('a')}
         <div className="vs-col">
           {view.phase === 'voting' ? (
             <Countdown ms={ms} totalMs={total} paused={view.paused} />
           ) : (
-            <div className="vs">{tie ? 'TIE' : 'VS'}</div>
+            <div className="vs">{tie ? t('host.match.tie') : t('host.match.vs')}</div>
           )}
         </div>
-        <EntryCard entry={eb} side="b" className={`big ${cardClass('b')}`} badge={reveal && m.winner === 'b' ? 'WINNER' : undefined}>
-          {tie && (
-            <button className="btn btn-primary pick" onClick={() => act('host:pickWinner', { side: 'b' })}>
-              Pick this one
-            </button>
-          )}
-        </EntryCard>
+        {card('b')}
       </div>
 
       <div className="match-foot">
         {showCounts && m.decidedBy !== 'forfeit' && <VoteBar a={m.votesA!} b={m.votesB!} winner={m.winner} />}
         {view.phase === 'voting' && (
           <div className="voted-count">
-            <b>{m.votedCount}</b> / {m.eligibleCount} voted{!showCounts && ' · results at the reveal'}
+            {tNodes(t, 'host.match.voted', { voted: <b>{m.votedCount}</b> }, { eligible: m.eligibleCount })}
+            {!showCounts && <> · {t('host.match.resultsAtReveal')}</>}
           </div>
         )}
-        {tie && <div className="tie-msg">It's a tie! Host, pick the winner.</div>}
-        {reveal && m.decidedBy && DECIDED_BY_LABEL[m.decidedBy] && <div className="decided-by">{DECIDED_BY_LABEL[m.decidedBy]}</div>}
+        {tie && <div className="tie-msg">{t('host.match.tieHost')}</div>}
+        {decidedBy && <div className="decided-by">{decidedBy}</div>}
       </div>
     </div>
   );
 }
 
 function Overview({ view, serverNow }: { view: RoomView; serverNow: () => number }) {
+  const { t } = useTranslation();
   useTick(250);
   const b = view.bracket!;
   const next = view.nextMatchId ? allMatches(b).find((m) => m.id === view.nextMatchId) : null;
@@ -406,12 +412,15 @@ function Overview({ view, serverNow }: { view: RoomView; serverNow: () => number
     <div className="overview">
       <div className="overview-head">
         <h2>
-          Up next: <span className="side-a-text">{ea?.ownerName}</span> vs <span className="side-b-text">{eb?.ownerName}</span>
+          {tNodes(t, 'host.overview.upNext', {
+            a: <span className="side-a-text">{ea?.ownerName}</span>,
+            b: <span className="side-b-text">{eb?.ownerName}</span>,
+          })}
         </h2>
         <span className="muted">
-          {matchProgress(view, view.nextMatchId)}
-          {ms !== null && !view.paused && ` · starting in ${Math.ceil(ms / 1000)}s`}
-          {view.paused && ' · paused'}
+          {matchProgress(t, view, view.nextMatchId)}
+          {ms !== null && !view.paused && ` · ${t('host.overview.startingIn', { count: Math.ceil(ms / 1000) })}`}
+          {view.paused && ` · ${t('host.overview.paused')}`}
         </span>
       </div>
       <BracketView bracket={b} entries={view.entries} highlight={view.nextMatchId} focusRound={focusRound} />
@@ -420,6 +429,7 @@ function Overview({ view, serverNow }: { view: RoomView; serverNow: () => number
 }
 
 function Finished({ view }: { view: RoomView }) {
+  const { t } = useTranslation();
   const champ = view.champion ? view.entries[view.champion] : undefined;
   return (
     <div className="finished">
@@ -438,12 +448,12 @@ function Finished({ view }: { view: RoomView }) {
               />
             ))}
           </div>
-          <div className="champion-title">🏆 Champion 🏆</div>
+          <div className="champion-title">{t('host.finished.champion')}</div>
           <EntryCard entry={champ} className="champion-card" />
         </div>
       ) : (
         <div className="champion">
-          <div className="champion-title">No champion: every entry was removed.</div>
+          <div className="champion-title">{t('host.finished.noChampion')}</div>
         </div>
       )}
       <div className="finished-bracket">
@@ -455,37 +465,35 @@ function Finished({ view }: { view: RoomView }) {
 
 // ------------------------------------------------------------------ controls
 
-function HostControls({ view, act }: { view: RoomView; act: (e: string, p?: object) => Promise<boolean> }) {
+function HostControls({ view, act }: { view: RoomView; act: Act }) {
+  const { t } = useTranslation();
   const timed = view.phase === 'voting' || view.phase === 'reveal' || view.phase === 'overview';
-  const nextLabel = { voting: 'End vote', reveal: 'Next', overview: 'Start match', tiebreak: '', lobby: '', finished: '' }[view.phase];
+  const nextLabel = view.phase === 'reveal' ? t('host.controls.next') : view.phase === 'overview' ? t('host.controls.startMatch') : null;
   return (
     <footer className="host-controls">
       {view.phase === 'finished' ? (
         <button className="btn btn-primary btn-big" onClick={() => act('host:playAgain')}>
-          Play again
+          {t('host.controls.playAgain')}
         </button>
       ) : (
         <>
           {timed && (
             <button className="btn btn-secondary" onClick={() => act(view.paused ? 'host:resume' : 'host:pause')}>
-              {view.paused ? '▶ Resume' : '❚❚ Pause'}
+              {view.paused ? t('host.controls.resume') : t('host.controls.pause')}
             </button>
           )}
           {view.phase === 'voting' && (
             <button className="btn btn-secondary" onClick={() => act('host:skipTimer')}>
-              ⏭ Skip timer
+              {t('host.controls.skipTimer')}
             </button>
           )}
-          {nextLabel && view.phase !== 'voting' && (
+          {nextLabel && (
             <button className="btn btn-primary" onClick={() => act('host:advance')}>
-              {nextLabel} →
+              {nextLabel}
             </button>
           )}
-          <button
-            className="btn btn-ghost"
-            onClick={() => confirm('End this game and go back to the lobby? Entries will be cleared.') && act('host:playAgain')}
-          >
-            Reset
+          <button className="btn btn-ghost" onClick={() => confirm(t('host.controls.resetConfirm')) && act('host:playAgain')}>
+            {t('host.controls.reset')}
           </button>
         </>
       )}
@@ -493,25 +501,18 @@ function HostControls({ view, act }: { view: RoomView; act: (e: string, p?: obje
   );
 }
 
-function ManageDialog({
-  view,
-  act,
-  onClose,
-}: {
-  view: RoomView;
-  act: (e: string, p?: object) => Promise<boolean>;
-  onClose: () => void;
-}) {
+function ManageDialog({ view, act, onClose }: { view: RoomView; act: Act; onClose: () => void }) {
+  const { t } = useTranslation();
   const inGame = view.bracket !== null && view.phase !== 'finished';
   const removed = new Set(view.bracket?.removed ?? []);
   const entries = Object.values(view.entries);
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Manage players">
+      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t('host.manage.label')}>
         <div className="modal-head">
-          <h2>Players</h2>
+          <h2>{t('host.manage.players')}</h2>
           <button className="btn btn-ghost" onClick={onClose}>
-            Close
+            {t('common.close')}
           </button>
         </div>
         <ul className="manage-list">
@@ -519,18 +520,21 @@ function ManageDialog({
             <li key={p.id}>
               <span className={`dot ${p.connected ? 'on' : 'off'}`} />
               <span className="grow">{p.name}</span>
-              <span className="muted">{p.role}</span>
-              <button className="btn btn-small btn-danger" onClick={() => confirm(`Kick ${p.name}?`) && act('host:kick', { playerId: p.id })}>
-                Kick
+              <span className="muted">{t(`roles.${p.role}`)}</span>
+              <button
+                className="btn btn-small btn-danger"
+                onClick={() => confirm(t('host.lobby.kickConfirm', { name: p.name })) && act('host:kick', { playerId: p.id })}
+              >
+                {t('host.manage.kick')}
               </button>
             </li>
           ))}
-          {view.players.length === 0 && <li className="muted">No players yet.</li>}
+          {view.players.length === 0 && <li className="muted">{t('host.manage.noPlayers')}</li>}
         </ul>
         {inGame && entries.length > 0 && (
           <>
-            <h2>Entries</h2>
-            <p className="muted">Removing an entry lets its opponent advance.</p>
+            <h2>{t('host.manage.entries')}</h2>
+            <p className="muted">{t('host.manage.entriesHint')}</p>
             <ul className="manage-list">
               {entries.map((e) => (
                 <li key={e.id}>
@@ -539,13 +543,15 @@ function ManageDialog({
                     {e.text && <span className="muted"> · {e.text.slice(0, 40)}</span>}
                   </span>
                   {removed.has(e.id) ? (
-                    <span className="muted">removed</span>
+                    <span className="muted">{t('host.manage.removed')}</span>
                   ) : (
                     <button
                       className="btn btn-small btn-danger"
-                      onClick={() => confirm(`Remove ${e.ownerName}'s entry from the bracket?`) && act('host:removeEntry', { entryId: e.id })}
+                      onClick={() =>
+                        confirm(t('host.manage.removeConfirm', { name: e.ownerName })) && act('host:removeEntry', { entryId: e.id })
+                      }
                     >
-                      Remove
+                      {t('host.manage.remove')}
                     </button>
                   )}
                 </li>

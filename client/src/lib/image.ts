@@ -1,3 +1,5 @@
+import { CodedError } from '../i18n/text';
+
 const MAX_EDGE = 1600;
 const QUALITY = 0.85;
 const MAX_INPUT_BYTES = 40 * 1024 * 1024;
@@ -44,20 +46,20 @@ function toBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob | null> {
  * encoding is unsupported, e.g. Safari). Strips EXIF/location data as a bonus.
  */
 export async function prepareImage(file: File): Promise<Blob> {
-  if (!looksLikeImage(file)) throw new Error('That file is not an image.');
-  if (file.size > MAX_INPUT_BYTES) throw new Error('That image is too large.');
+  if (!looksLikeImage(file)) throw new CodedError({ code: 'notAnImage' });
+  if (file.size > MAX_INPUT_BYTES) throw new CodedError({ code: 'imageTooBig' });
 
   let drawable: Drawable;
   try {
     drawable = await decode(file);
   } catch {
-    if (!isHeic(file)) throw new Error("Couldn't read that image. Try a JPEG or PNG.");
+    if (!isHeic(file)) throw new CodedError({ code: 'imageUnreadable' });
     try {
       const { default: heic2any } = await import('heic2any');
       const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
       drawable = await decode(Array.isArray(converted) ? converted[0] : converted);
     } catch {
-      throw new Error("Couldn't convert that HEIC photo. Try taking a screenshot of it, or use JPEG.");
+      throw new CodedError({ code: 'heicFailed' });
     }
   }
 
@@ -67,14 +69,14 @@ export async function prepareImage(file: File): Promise<Blob> {
     canvas.width = Math.max(1, Math.round(drawable.width * scale));
     canvas.height = Math.max(1, Math.round(drawable.height * scale));
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Your browser cannot process images.');
+    if (!ctx) throw new CodedError({ code: 'noCanvas' });
     ctx.fillStyle = '#fff'; // transparent PNGs would otherwise turn black in JPEG
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(drawable.source, 0, 0, canvas.width, canvas.height);
     const webp = await toBlob(canvas, 'image/webp');
     if (webp && webp.type === 'image/webp') return webp;
     const jpeg = await toBlob(canvas, 'image/jpeg');
-    if (!jpeg) throw new Error('Could not compress that image.');
+    if (!jpeg) throw new CodedError({ code: 'compressFailed' });
     return jpeg;
   } finally {
     drawable.close();

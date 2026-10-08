@@ -1,0 +1,228 @@
+{
+  "language": {
+    "label": "Language"
+  },
+  "common": {
+    "backToStart": "Back to start",
+    "connecting": "Connecting…",
+    "reconnecting": "Reconnecting…",
+    "close": "Close"
+  },
+  "roles": {
+    "undecided": "Choosing…",
+    "competitor": "Competing",
+    "voter": "Voting"
+  },
+  "rounds": {
+    "final": "Final",
+    "semifinals": "Semifinals",
+    "quarterfinals": "Quarterfinals",
+    "round": "Round {{number}}"
+  },
+  "entry": {
+    "by": "by {{name}}",
+    "imageAlt": "Entry by {{name}}"
+  },
+  "bracket": {
+    "tbd": "TBD",
+    "bye": "advances automatically"
+  },
+  "home": {
+    "tagline": "Submit something. Battle head to head. Everyone votes.",
+    "joinTitle": "Join a game",
+    "codePlaceholder": "CODE",
+    "joining": "Joining…",
+    "join": "Join game",
+    "hostHint": "Hosting? Open this on a TV or laptop everyone can see.",
+    "hostPassword": "Host password",
+    "creating": "Creating…",
+    "create": "Create room"
+  },
+  "host": {
+    "join": "Join: {{code}}",
+    "players": "Players ({{count}})",
+    "toggleSound": "Toggle sound effects",
+    "fullscreen": "Full screen (F)",
+    "lobby": {
+      "scanToJoin": "Scan to join, or go to",
+      "qrLabel": "QR code to join",
+      "roomCode": "Room code",
+      "players": "Players",
+      "waitingForPlayers": "Waiting for players to join…",
+      "kick": "Kick {{name}}",
+      "kickConfirm": "Kick {{name}}?",
+      "submitted": "{{submitted}} entries submitted",
+      "bracketSize": "Bracket of {{size}}",
+      "byes_one": "{{n}} bye",
+      "byes_other": "{{n}} byes",
+      "bracketFull": "Bracket full: new players can only vote",
+      "start": "Start game"
+    },
+    "settings": {
+      "title": "Settings",
+      "maxEntries": "Max entries",
+      "auto": "Auto (up to {{max}})",
+      "voteTimer": "Vote timer",
+      "seconds_one": "{{count}} second",
+      "seconds_other": "{{count}} seconds",
+      "entries": "Entries",
+      "imageOrText": "Image and/or text",
+      "imageOnly": "Image only",
+      "textOnly": "Text only",
+      "ties": "Ties",
+      "suddenDeath": "{{seconds}}s sudden death, then random",
+      "random": "Random",
+      "hostDecides": "Host decides",
+      "showLiveVotes": "Show live vote counts",
+      "allowSelfVote": "Contestants may vote in their own matchup"
+    },
+    "match": {
+      "progress": "Match {{current}} of {{total}}",
+      "suddenDeath": "Sudden death!",
+      "winner": "WINNER",
+      "pickThis": "Pick this one",
+      "tie": "TIE",
+      "vs": "VS",
+      "voted": "{{voted}} / {{eligible}} voted",
+      "resultsAtReveal": "results at the reveal",
+      "tieHost": "It's a tie! Host, pick the winner.",
+      "decidedBy": {
+        "suddenDeath": "Won in sudden death",
+        "random": "Tie broken at random",
+        "host": "Tie broken by the host",
+        "forfeit": "Opponent removed: advances automatically"
+      }
+    },
+    "overview": {
+      "upNext": "Up next: {{a}} vs {{b}}",
+      "startingIn": "starting in {{count}}s",
+      "paused": "paused"
+    },
+    "finished": {
+      "champion": "🏆 Champion 🏆",
+      "noChampion": "No champion: every entry was removed."
+    },
+    "controls": {
+      "playAgain": "Play again",
+      "resume": "▶ Resume",
+      "pause": "❚❚ Pause",
+      "skipTimer": "⏭ Skip timer",
+      "next": "Next →",
+      "startMatch": "Start match →",
+      "reset": "Reset",
+      "resetConfirm": "End this game and go back to the lobby? Entries will be cleared."
+    },
+    "manage": {
+      "label": "Manage players",
+      "players": "Players",
+      "kick": "Kick",
+      "noPlayers": "No players yet.",
+      "entries": "Entries",
+      "entriesHint": "Removing an entry lets its opponent advance.",
+      "removed": "removed",
+      "remove": "Remove",
+      "removeConfirm": "Remove {{name}}'s entry from the bracket?"
+    }
+  },
+  "player": {
+    "joinForm": {
+      "title": "Joining room {{code}}",
+      "name": "Your name",
+      "namePlaceholder": "e.g. Sam",
+      "joining": "Joining…",
+      "join": "Join"
+    },
+    "lobby": {
+      "howToPlay": "How do you want to play?",
+      "compete": "🥊 Compete",
+      "competeHint": "Submit an entry into the bracket",
+      "bracketFull": "The bracket is full",
+      "justVote": "🗳️ Just vote",
+      "justVoteHint": "Pick the winners of every matchup",
+      "youreVoter": "You're a voter",
+      "waitingForStart": "Waiting for the host to start the game…",
+      "bracketFullShort": "Bracket is full",
+      "switchToCompeting": "Switch to competing",
+      "submitted": "Entry submitted! Waiting for the host to start…",
+      "editEntry": "Edit entry",
+      "withdrawConfirm": "Withdraw your entry and just vote?",
+      "switchToVoting": "Switch to just voting"
+    },
+    "editor": {
+      "title": "Your entry",
+      "hintImage": "Add an image. It will be shown with your name.",
+      "hintText": "Write your entry. It will be shown with your name.",
+      "hintBoth": "Add an image, some text, or both. It will be shown with your name.",
+      "imageAlt": "Your entry",
+      "removeImage": "Remove image",
+      "processing": "Processing…",
+      "noImage": "No image yet",
+      "camera": "📷 Camera",
+      "gallery": "🖼️ Gallery",
+      "text": "Text",
+      "caption": "Text (optional caption)",
+      "textPlaceholder": "Type something…",
+      "uploading": "Uploading…",
+      "save": "Save entry",
+      "submit": "Submit entry",
+      "cancel": "Cancel",
+      "justVote": "Actually, I'll just vote"
+    },
+    "status": {
+      "alive": "Your entry is still in the running 💪",
+      "eliminated": "Your entry was eliminated ({{round}}).",
+      "removed": "Your entry was removed by the host.",
+      "champion": "Your entry won! 🏆"
+    },
+    "match": {
+      "waiting": "Waiting for the next match…",
+      "advances": "Your entry advances! 🎉",
+      "eliminated": "You've been eliminated 😢",
+      "pickWon": "Your pick won!",
+      "wins": "{{name}} wins!",
+      "tieDeciding": "It's a tie! The host is deciding…",
+      "yourEntryUp": "Your entry is up! 🔥",
+      "suddenDeath": "Sudden death! Vote again!",
+      "voteSaved": "Vote saved, tap the other one to change it.",
+      "tapFavourite": "Tap your favourite!",
+      "yourVote": "✓ Your vote",
+      "you": "You",
+      "voted": "{{voted}}/{{eligible}} voted",
+      "blocked": {
+        "ownMatchup": "You can't vote in your own matchup.",
+        "paused": "Paused"
+      }
+    },
+    "overview": {
+      "upNextYou": "Your entry is up next!",
+      "waiting": "Waiting for the next match",
+      "versus": "{{a}} vs {{b}}",
+      "paused": "The host paused the game."
+    },
+    "finished": {
+      "youWon": "You won the bracket!",
+      "champion": "{{name}} is the champion!",
+      "gameOver": "Game over",
+      "waiting": "Waiting for the host to start another round…"
+    }
+  },
+  "errors": {
+    "notHostScreen": "This screen is not the host of this room.",
+    "kicked": "The host removed you from this room.",
+    "roomClosed": "This room was closed after being inactive.",
+    "roomGone": "This room no longer exists.",
+    "offline": "Not connected, retrying…",
+    "noResponse": "The server did not respond.",
+    "requestFailed": "Request failed ({{status}}).",
+    "notAnImage": "That file is not an image.",
+    "imageTooBig": "That image is too large.",
+    "imageUnreadable": "Couldn't read that image. Try a JPEG or PNG.",
+    "heicFailed": "Couldn't convert that HEIC photo. Try taking a screenshot of it, or use JPEG.",
+    "noCanvas": "Your browser cannot process images.",
+    "compressFailed": "Could not compress that image.",
+    "sessionLost": "Session lost. Please rejoin.",
+    "fullscreenUnavailable": "Fullscreen is not available here.",
+    "codeLength": "Room codes have 4–5 characters.",
+    "noRoomWithCode": "No room with code {{code}}. Check the main screen."
+  }
+}

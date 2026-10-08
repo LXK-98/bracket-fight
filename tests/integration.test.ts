@@ -123,7 +123,11 @@ describe('server', () => {
     const a = await alice.emit<{ token: string }>('player:join', { code, name: 'Alice' });
     expect(a.ok).toBe(true);
     const bob = client();
-    expect((await bob.emit('player:join', { code, name: 'alice' })).error).toMatch(/taken/);
+    expect(await bob.emit('player:join', { code, name: 'alice' })).toEqual({
+      ok: false,
+      code: 'nameTaken',
+      error: 'That name is already taken in this room.',
+    });
     const b = await bob.emit<{ token: string }>('player:join', { code, name: 'Bob' });
     const carol = client();
     await carol.emit('player:join', { code, name: 'Carol' });
@@ -135,11 +139,18 @@ describe('server', () => {
     // Upload validation
     expect((await submit(code, 'bogus', { text: 'x' })).status).toBe(401);
     expect((await submit(code, a.token, {}, Buffer.from('not an image at all'))).status).toBe(415);
-    expect((await submit(code, a.token, {}, Buffer.alloc(70 * 1024, 0xff))).status).toBe(413);
+    const tooBig = await submit(code, a.token, {}, Buffer.alloc(70 * 1024, 0xff));
+    expect(tooBig.status).toBe(413);
+    expect(tooBig.body).toMatchObject({ code: 'imageTooLarge', params: { mb: '0' } });
 
     let hv = await host.until((v) => v.lobby.competitorCount === 2);
     expect(hv.lobby.canStart).toBe(false);
-    expect((await host.emit('host:start')).error).toMatch(/Waiting for 2/);
+    expect(await host.emit('host:start')).toMatchObject({
+      ok: false,
+      code: 'waitingForEntries',
+      params: { count: 2 },
+      error: 'Waiting for 2 competitors to submit an entry.',
+    });
 
     expect((await submit(code, a.token, { text: 'Cats <b>rule</b>' }, PNG)).status).toBe(200);
     expect((await submit(code, b.token, { text: 'Dogs' })).status).toBe(200);

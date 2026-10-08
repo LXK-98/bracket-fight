@@ -69,12 +69,21 @@ describe('lobby', () => {
     const a = room.join('A');
     room.setRole(a.id, 'competitor');
     expect(room.lobbyInfo().canStart).toBe(false);
-    expect(room.lobbyInfo().startBlockedReason).toMatch(/at least 2/);
+    expect(room.lobbyInfo().startBlocked).toEqual({
+      code: 'needTwoCompetitors',
+      params: { current: 1 },
+      message: 'Need at least 2 competitors (1 so far).',
+    });
     const b = room.join('B');
     room.setRole(b.id, 'competitor');
     room.submitEntry(a.id, { text: 'hi', imageFile: null, removeImage: false });
-    expect(room.lobbyInfo().startBlockedReason).toMatch(/Waiting for 1 competitor/);
+    expect(room.lobbyInfo().startBlocked?.message).toBe('Waiting for 1 competitor to submit an entry.');
     expect(() => room.start()).toThrow(GameError);
+    try {
+      room.start();
+    } catch (err) {
+      expect(err).toMatchObject({ code: 'waitingForEntries', params: { count: 1 } });
+    }
     room.submitEntry(b.id, { text: 'yo', imageFile: null, removeImage: false });
     expect(room.lobbyInfo().canStart).toBe(true);
     expect(room.lobbyInfo().bracketSize).toBe(2);
@@ -188,6 +197,7 @@ describe('match flow', () => {
     expect(() => room.vote(comps[0].id, room.currentMatchId!, 'a')).toThrow(/own matchup/);
     const v = room.view({ kind: 'player', playerId: comps[0].id });
     expect(v.me?.canVote).toBe(false);
+    expect(v.me?.voteBlocked).toBe('ownMatchup');
     expect(v.match?.eligibleCount).toBe(1);
     room.vote(voters[0].id, room.currentMatchId!, 'a');
     vi.advanceTimersByTime(1500); // only eligible voter voted -> early end

@@ -1,8 +1,10 @@
 // Types shared between server and client. The server is authoritative; clients
 // only ever receive these views and send actions.
-import type { Bracket, Side } from './bracket';
+import type { Bracket, DecidedBy, Side } from './bracket';
+import type { MessageParams, Problem } from './messages';
 
 export type { Bracket, Match, Side, DecidedBy } from './bracket';
+export type { MessageCode, MessageParams, Problem } from './messages';
 
 export type Role = 'undecided' | 'competitor' | 'voter';
 export type EntryMode = 'image' | 'text' | 'imageOrText';
@@ -60,7 +62,6 @@ export interface PublicEntry {
 export interface MatchView {
   matchId: string;
   round: number;
-  roundName: string;
   a: string;
   b: string;
   suddenDeath: boolean;
@@ -71,7 +72,7 @@ export interface MatchView {
   eligibleCount: number;
   /** Set once the match is decided (reveal phase). */
   winner: Side | null;
-  decidedBy: string | null;
+  decidedBy: DecidedBy | null;
 }
 
 export interface LobbyInfo {
@@ -81,7 +82,8 @@ export interface LobbyInfo {
   bracketSize: number;
   byes: number;
   canStart: boolean;
-  startBlockedReason: string | null;
+  /** Why the host can't start yet (null when they can). */
+  startBlocked: Problem | null;
   competitorsFull: boolean;
 }
 
@@ -94,7 +96,8 @@ export interface MeView {
   submitted: boolean;
   vote: Side | null;
   canVote: boolean;
-  voteBlockedReason: string | null;
+  /** Why this player can't vote in the running match, if they can't. */
+  voteBlocked: 'ownMatchup' | 'paused' | null;
   /** Bracket status of my entry while a game is running. */
   entryStatus: 'none' | 'alive' | 'eliminated' | 'champion' | 'removed';
   eliminatedRound: number | null;
@@ -123,7 +126,15 @@ export interface RoomView {
   me: MeView | null;
 }
 
-export type Ack<T = object> = (res: ({ ok: true } & T) | { ok: false; error: string }) => void;
+/** Failed action: `error` is the English text; `code` + `params` are for translating it. */
+export interface AckError {
+  ok: false;
+  error: string;
+  code: Problem['code'];
+  params?: MessageParams;
+}
+
+export type Ack<T = object> = (res: ({ ok: true } & T) | AckError) => void;
 
 export interface JoinPayload {
   code: string;

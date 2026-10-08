@@ -317,6 +317,21 @@ textarea {
   color: var(--muted);
 }
 
+.home-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -0.75rem;
+}
+
+.lang-select {
+  width: auto;
+  padding: 0.35em 0.6em;
+  border-width: 1px;
+  border-radius: 10px;
+  background: var(--card);
+  cursor: pointer;
+}
+
 .host-password {
   margin-bottom: 0.8rem;
   text-align: center;
@@ -403,13 +418,12 @@ button.entry-card:disabled {
 }
 
 .entry-owner {
-  font-weight: 800;
+  font-weight: 500;
   color: var(--muted);
 }
 
-.entry-owner::before {
-  content: 'by ';
-  font-weight: 500;
+.entry-owner b {
+  font-weight: 800;
 }
 
 .entry-badge {
@@ -1247,6 +1261,7 @@ button.entry-card:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   padding: max(0.7rem, env(safe-area-inset-top)) 1rem 0.7rem;
   background: rgba(15, 16, 32, 0.85);
   backdrop-filter: blur(8px);
@@ -1255,6 +1270,20 @@ button.entry-card:disabled {
   top: 0;
   z-index: 10;
   border-bottom: 1px solid var(--line);
+}
+
+.player-bar .logo {
+  white-space: nowrap;
+}
+
+/* Very narrow phones: the player's own name matters more than the logo. */
+@media (max-width: 359px) {
+  .player-bar .logo {
+    display: none;
+  }
+  .player-bar {
+    justify-content: flex-end;
+  }
 }
 
 .player-bar-right {

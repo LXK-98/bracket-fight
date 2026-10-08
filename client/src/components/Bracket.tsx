@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { roundName } from '../../../shared/bracket';
+import { useTranslation } from 'react-i18next';
 import type { Bracket, Match, PublicEntry } from '../../../shared/types';
+import { roundLabel } from '../i18n/text';
 
 interface Props {
   bracket: Bracket;
@@ -17,8 +18,9 @@ interface Props {
 }
 
 function Slot({ id, match, entries, removed }: { id: string | null; match: Match; entries: Record<string, PublicEntry>; removed: Set<string> }) {
+  const { t } = useTranslation();
   if (id === null) {
-    return <div className="slot slot-empty">{match.bye ? '' : 'TBD'}</div>;
+    return <div className="slot slot-empty">{match.bye ? '' : t('bracket.tbd')}</div>;
   }
   const e = entries[id];
   const state = match.winner === null || match.bye ? '' : match.winner === id ? 'won' : 'lost';
@@ -29,7 +31,7 @@ function Slot({ id, match, entries, removed }: { id: string | null; match: Match
       <div className="slot-label">
         <span className="slot-name">{e?.ownerName ?? '?'}</span>
         {match.bye ? (
-          <span className="slot-text slot-bye-note">advances automatically</span>
+          <span className="slot-text slot-bye-note">{t('bracket.bye')}</span>
         ) : (
           e?.text && <span className="slot-text">{e.text}</span>
         )}
@@ -52,6 +54,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export function BracketView({ bracket, entries, highlight, focusRound = null, maxScale = 1.6 }: Props) {
+  const { t } = useTranslation();
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -81,7 +84,7 @@ export function BracketView({ bracket, entries, highlight, focusRound = null, ma
       <div className="bracket" ref={inner} style={{ transform: `translate(-50%, -50%) scale(${scale})` }}>
         {rounds.map((round) => (
           <div className="bracket-round" key={round[0].round}>
-            <div className="bracket-round-title">{roundName(round[0].round, bracket.rounds.length)}</div>
+            <div className="bracket-round-title">{roundLabel(t, round[0].round, bracket.rounds.length)}</div>
             <div className="bracket-columns">
               {(split ? chunk(round, MAX_PER_COLUMN) : [round]).map((column, ci) => (
                 <div className="bracket-matches" key={ci}>

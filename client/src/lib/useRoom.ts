@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { RoomView } from '../../../shared/types';
+import type { AckError, RoomView } from '../../../shared/types';
+import type { Problem } from '../i18n/text';
 import { hostToken, playerToken } from './storage';
 
-export type AckResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+/** Failure as the server sends it, or a client-side one (offline, no response). */
+export type AckFailure = Omit<AckError, 'code'> & { code: string };
+export type AckResult<T = object> = ({ ok: true } & T) | AckFailure;
+
+export function ackProblem(res: AckFailure): Problem {
+  return { code: res.code, params: res.params, message: res.error };
+}
 
 export interface RoomConnection {
   view: RoomView | null;
   connected: boolean;
   /** Unrecoverable state: kicked, room gone, not the host... */
-  fatal: string | null;
+  fatal: Problem | null;
   /** Player has no valid session and must enter a name. */
   needsJoin: boolean;
   emit: <T = object>(event: string, payload?: object) => Promise<AckResult<T>>;
@@ -21,7 +28,7 @@ export interface RoomConnection {
 export function useRoom(code: string, mode: 'host' | 'player'): RoomConnection {
   const [view, setView] = useState<RoomView | null>(null);
   const [connected, setConnected] = useState(false);
-  const [fatal, setFatal] = useState<string | null>(null);
+  const [fatal, setFatal] = useState<Problem | null>(null);
   const [needsJoin, setNeedsJoin] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const offsetRef = useRef(0);
@@ -35,9 +42,9 @@ export function useRoom(code: string, mode: 'host' | 'player'): RoomConnection {
     const authenticate = () => {
       if (mode === 'host') {
         const token = hostToken.get(code);
-        if (!token) return setFatal('This screen is not the host of this room.');
+        if (!token) return setFatal({ code: 'notHostScreen' });
         socket.emit('host:attach', { code, hostToken: token }, (res: AckResult) => {
-          if (!res.ok) setFatal(res.error);
+          if (!res.ok) setFatal(ackProblem(res));
         });
         return;
       }
@@ -45,7 +52,7 @@ export function useRoom(code: string, mode: 'host' | 'player'): RoomConnection {
       if (!token) return setNeedsJoin(true);
       socket.emit('player:resume', { code, token }, (res: AckResult) => {
         if (res.ok) return;
-        if (/room not found/i.test(res.error)) return setFatal('This room no longer exists.');
+        if (res.code === 'roomNotFound') return setFatal({ code: 'roomGone' });
         playerToken.set(code, null);
         setNeedsJoin(true);
       });
@@ -63,9 +70,9 @@ export function useRoom(code: string, mode: 'host' | 'player'): RoomConnection {
     });
     socket.on('kicked', () => {
       playerToken.set(code, null);
-      setFatal('The host removed you from this room.');
+      setFatal({ code: 'kicked' });
     });
-    socket.on('roomClosed', () => setFatal('This room was closed after being inactive.'));
+    socket.on('roomClosed', () => setFatal({ code: 'roomClosed' }));
 
     return () => {
       socket.close();
@@ -76,9 +83,9 @@ export function useRoom(code: string, mode: 'host' | 'player'): RoomConnection {
   const emit = useCallback(<T,>(event: string, payload: object = {}) => {
     return new Promise<AckResult<T>>((resolve) => {
       const socket = socketRef.current;
-      if (!socket?.connected) return resolve({ ok: false, error: 'Not connected, retrying…' });
+      if (!socket?.connected) return resolve({ ok: false, code: 'offline', error: 'Not connected, retrying…' });
       socket.timeout(8000).emit(event, payload, (err: Error | null, res: AckResult<T>) => {
-        resolve(err ? { ok: false, error: 'The server did not respond.' } : res);
+        resolve(err ? { ok: false, code: 'noResponse', error: 'The server did not respond.' } : res);
       });
     });
   }, []);

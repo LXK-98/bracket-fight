@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import type { PublicEntry } from '../../../shared/types';
+import { tNodes } from '../i18n/text';
 
 interface Props {
   entry: PublicEntry | undefined;
@@ -13,6 +15,7 @@ interface Props {
 
 /** An entry: image and/or text plus the owner's name. Used on the TV and phones. */
 export function EntryCard({ entry, side, className = '', onClick, disabled, selected, badge, children }: Props) {
+  const { t } = useTranslation();
   const Tag = onClick ? 'button' : 'div';
   const textOnly = entry && !entry.imageUrl;
   return (
@@ -26,11 +29,11 @@ export function EntryCard({ entry, side, className = '', onClick, disabled, sele
       {badge && <div className="entry-badge">{badge}</div>}
       {entry?.imageUrl && (
         <div className="entry-image">
-          <img src={entry.imageUrl} alt={entry.text ?? `Entry by ${entry.ownerName}`} draggable={false} />
+          <img src={entry.imageUrl} alt={entry.text ?? t('entry.imageAlt', { name: entry.ownerName })} draggable={false} />
         </div>
       )}
       {entry?.text && <div className="entry-text">{entry.text}</div>}
-      <div className="entry-owner">{entry ? entry.ownerName : '?'}</div>
+      <div className="entry-owner">{entry ? tNodes(t, 'entry.by', { name: <b>{entry.ownerName}</b> }) : '?'}</div>
       {children}
     </Tag>
   );

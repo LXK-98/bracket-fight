@@ -6,8 +6,9 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import multer from 'multer';
 import QRCode from 'qrcode';
 import { Server, type Socket } from 'socket.io';
+import { problem, type MessageCode, type MessageParams } from '../shared/messages';
 import { normalizeCode } from '../shared/sanitize';
-import type { Ack } from '../shared/types';
+import type { Ack, AckError } from '../shared/types';
 import type { Config } from './config';
 import { RateLimiter } from './rateLimit';
 import { GameError, type Room, type Viewer } from './room';
@@ -22,6 +23,16 @@ interface SocketData {
 type AppSocket = Socket<any, any, any, SocketData>;
 
 const channel = (code: string) => `room:${code}`;
+
+/** JSON error body: English `error` text plus `code`/`params` for clients to translate. */
+function fail(res: Response, status: number, code: MessageCode, params?: MessageParams) {
+  const p = problem(code, params);
+  return res.status(status).json({ error: p.message, code, ...(params && { params }) });
+}
+
+function ackError(code: MessageCode, params?: MessageParams): AckError {
+  return { ok: false, error: problem(code, params).message, code, ...(params && { params }) };
+}
 
 /** Constant-time string comparison (hashing first makes the lengths equal). */
 function safeEqual(a: string, b: string) {
@@ -92,23 +103,24 @@ export async function createApp(config: Config) {
     const ip = req.ip ?? 'unknown';
     if (config.hostPassword !== null) {
       if (passwordFailLimiter.blocked(ip)) {
-        return res.status(429).json({ error: 'Too many wrong passwords. Try again in a few minutes.' });
+        return fail(res, 429, 'passwordLocked');
       }
       const given: unknown = req.body?.password;
       if (typeof given !== 'string' || given === '') {
-        return res.status(401).json({ error: 'A password is required to create a room.' });
+        return fail(res, 401, 'passwordRequired');
       }
       if (!safeEqual(given, config.hostPassword)) {
         passwordFailLimiter.take(ip);
-        return res.status(401).json({ error: 'Wrong password.' });
+        return fail(res, 401, 'wrongPassword');
       }
     }
-    if (!createLimiter.take(ip)) return res.status(429).json({ error: 'Too many rooms created, slow down.' });
+    if (!createLimiter.take(ip)) return fail(res, 429, 'tooManyRooms');
     try {
       const room = rooms.create();
       res.json({ code: room.code, hostToken: room.hostToken });
     } catch (err) {
-      res.status(503).json({ error: (err as Error).message });
+      if (err instanceof GameError) return fail(res, 503, err.code, err.params);
+      throw err;
     }
   });
 
@@ -116,13 +128,13 @@ export async function createApp(config: Config) {
 
   app.get('/api/rooms/:code', (req, res) => {
     const room = roomFrom(req);
-    if (!room) return res.status(404).json({ error: 'Room not found.' });
+    if (!room) return fail(res, 404, 'roomNotFound');
     res.json({ code: room.code, phase: room.phase });
   });
 
   app.get('/api/rooms/:code/join-info', async (req, res) => {
     const room = roomFrom(req);
-    if (!room) return res.status(404).json({ error: 'Room not found.' });
+    if (!room) return fail(res, 404, 'roomNotFound');
     // Behind a reverse proxy (trust proxy is on) prefer the original host it forwards.
     const host = req.get('x-forwarded-host')?.split(',')[0].trim() || req.get('host');
     const base = config.publicUrl ?? `${req.protocol}://${host}`;
@@ -138,27 +150,27 @@ export async function createApp(config: Config) {
 
   app.post('/api/rooms/:code/entry', (req, res) => {
     const room = roomFrom(req);
-    if (!room) return res.status(404).json({ error: 'Room not found.' });
+    if (!room) return fail(res, 404, 'roomNotFound');
     const player = room.playerByToken(req.get('x-player-token'));
-    if (!player) return res.status(401).json({ error: 'Unknown player. Please rejoin.' });
+    if (!player) return fail(res, 401, 'unknownPlayer');
     if (!uploadRoomLimiter.take(room.code) || !uploadPlayerLimiter.take(player.id)) {
-      return res.status(429).json({ error: 'Too many uploads, wait a moment and try again.' });
+      return fail(res, 429, 'tooManyUploads');
     }
     upload(req, res, async (err: unknown) => {
       if (err) {
         const tooBig = err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE';
         const mb = (config.maxUploadBytes / 1024 / 1024).toFixed(0);
-        return res.status(tooBig ? 413 : 400).json({ error: tooBig ? `Image is too large (max ${mb} MB).` : 'Invalid upload.' });
+        return tooBig ? fail(res, 413, 'imageTooLarge', { mb }) : fail(res, 400, 'invalidUpload');
       }
       try {
         let imageFile: string | null = null;
         if (req.file) {
           const kind = detectImage(req.file.buffer);
-          if (!kind) return res.status(415).json({ error: 'Unsupported image type. Use JPEG, PNG, WebP or GIF.' });
-          if (room.phase !== 'lobby') throw new GameError('The game has already started.');
+          if (!kind) return fail(res, 415, 'unsupportedImage');
+          if (room.phase !== 'lobby') throw new GameError('gameStarted');
           imageFile = await storage.saveImage(room.code, req.file.buffer, kind);
         }
-        if (rooms.get(room.code) !== room) return res.status(404).json({ error: 'Room not found.' });
+        if (rooms.get(room.code) !== room) return fail(res, 404, 'roomNotFound');
         room.submitEntry(player.id, {
           text: req.body?.text ?? null,
           imageFile,
@@ -166,9 +178,9 @@ export async function createApp(config: Config) {
         });
         res.json({ ok: true });
       } catch (e) {
-        if (e instanceof GameError) return res.status(400).json({ error: e.message });
+        if (e instanceof GameError) return fail(res, 400, e.code, e.params);
         console.error('entry upload failed', e);
-        res.status(500).json({ error: 'Upload failed.' });
+        fail(res, 500, 'uploadFailed');
       }
     });
   });
@@ -178,7 +190,7 @@ export async function createApp(config: Config) {
     express.static(storage.roomsDir, { index: false, dotfiles: 'deny', maxAge: '1d', immutable: true, fallthrough: false }),
   );
 
-  app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
+  app.use('/api', (_req, res) => fail(res, 404, 'notFound'));
 
   // Frontend (production build). In dev, Vite serves it and proxies here.
   const indexHtml = path.join(config.clientDir, 'index.html');
@@ -194,7 +206,7 @@ export async function createApp(config: Config) {
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const status = (err as { status?: number }).status ?? 500;
     if (status >= 500) console.error(err);
-    res.status(status).json({ error: status === 404 ? 'Not found.' : status < 500 ? 'Bad request.' : 'Server error.' });
+    fail(res, status, status === 404 ? 'notFound' : status < 500 ? 'badRequest' : 'serverError');
   });
 
   // ------------------------------------------------------------ sockets
@@ -226,50 +238,50 @@ export async function createApp(config: Config) {
     const on = <P>(event: string, fn: Handler<P>) => {
       socket.on(event, ((payload: P, ack?: Ack) => {
         const reply: Ack = typeof ack === 'function' ? ack : () => {};
-        if (!socketLimiter.take(socket.id)) return reply({ ok: false, error: 'Slow down a little.' });
+        if (!socketLimiter.take(socket.id)) return reply(ackError('slowDown'));
         try {
           reply({ ok: true, ...(fn((payload ?? {}) as P) || {}) });
         } catch (err) {
-          if (err instanceof GameError) return reply({ ok: false, error: err.message });
+          if (err instanceof GameError) return reply(ackError(err.code, err.params));
           console.error(`socket ${event} failed`, err);
-          reply({ ok: false, error: 'Something went wrong.' });
+          reply(ackError('serverError'));
         }
       }) as never);
     };
 
     const requireRoom = (code: unknown) => {
       const room = rooms.get(normalizeCode(code));
-      if (!room) throw new GameError('Room not found. Check the code.');
+      if (!room) throw new GameError('roomNotFound');
       return room;
     };
 
     const current = () => {
       const room = socket.data.code ? rooms.get(socket.data.code) : undefined;
-      if (!room || !socket.data.viewer) throw new GameError('Not connected to a room.');
+      if (!room || !socket.data.viewer) throw new GameError('notConnected');
       return { room, viewer: socket.data.viewer };
     };
 
     const asPlayer = () => {
       const { room, viewer } = current();
-      if (viewer.kind !== 'player') throw new GameError('Only players can do that.');
+      if (viewer.kind !== 'player') throw new GameError('playersOnly');
       return { room, playerId: viewer.playerId };
     };
 
     const asHost = () => {
       const { room, viewer } = current();
-      if (viewer.kind !== 'host') throw new GameError('Only the host can do that.');
+      if (viewer.kind !== 'host') throw new GameError('hostOnly');
       return room;
     };
 
     on<{ code: string; hostToken: string }>('host:attach', ({ code, hostToken }) => {
       const room = requireRoom(code);
-      if (typeof hostToken !== 'string' || hostToken !== room.hostToken) throw new GameError('You are not the host of this room.');
+      if (typeof hostToken !== 'string' || hostToken !== room.hostToken) throw new GameError('notHost');
       bind(socket, room, { kind: 'host' });
     });
 
     on<{ code: string; name: string }>('player:join', ({ code, name }) => {
       const room = requireRoom(code);
-      if (!joinLimiter.take(room.code)) throw new GameError('Too many people joining at once, try again in a moment.');
+      if (!joinLimiter.take(room.code)) throw new GameError('tooManyJoins');
       const player = room.join(name);
       bind(socket, room, { kind: 'player', playerId: player.id });
       return { token: player.token, playerId: player.id, code: room.code };
@@ -278,7 +290,7 @@ export async function createApp(config: Config) {
     on<{ code: string; token: string }>('player:resume', ({ code, token }) => {
       const room = requireRoom(code);
       const player = room.playerByToken(token);
-      if (!player) throw new GameError('Session expired. Please join again.');
+      if (!player) throw new GameError('sessionExpired');
       bind(socket, room, { kind: 'player', playerId: player.id });
       return { playerId: player.id, code: room.code };
     });
@@ -308,7 +320,7 @@ export async function createApp(config: Config) {
     on<{ playerId: string }>('host:kick', ({ playerId }) => {
       const room = asHost();
       const kicked = room.kick(playerId);
-      if (!kicked) throw new GameError('Player not found.');
+      if (!kicked) throw new GameError('playerNotFound');
       for (const sid of io.sockets.adapter.rooms.get(channel(room.code)) ?? []) {
         const s = io.sockets.sockets.get(sid) as AppSocket | undefined;
         if (s?.data.viewer?.kind === 'player' && s.data.viewer.playerId === kicked.id) {

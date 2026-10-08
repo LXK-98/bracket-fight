@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { Config } from './config';
-import { Room } from './room';
+import { GameError, Room } from './room';
 import type { Storage } from './storage';
 
 // Consonants only: easy to type on a phone and avoids spelling real words.
@@ -28,7 +28,7 @@ export class RoomManager {
   }
 
   create(): Room {
-    if (this.rooms.size >= this.config.maxRooms) throw new Error('Server is full, try again later.');
+    if (this.rooms.size >= this.config.maxRooms) throw new GameError('serverFull');
     let code = randomCode(4);
     for (let attempt = 0; this.rooms.has(code); attempt++) code = randomCode(attempt < 20 ? 4 : 5);
     const room = new Room(code, {

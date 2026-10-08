@@ -1,0 +1,278 @@
+{
+  "language": {
+    "label": "Sprache"
+  },
+  "common": {
+    "backToStart": "Zurück zum Start",
+    "connecting": "Verbinde…",
+    "reconnecting": "Verbindung wird wiederhergestellt…",
+    "close": "Schließen"
+  },
+  "roles": {
+    "undecided": "Wählt noch…",
+    "competitor": "Tritt an",
+    "voter": "Stimmt ab"
+  },
+  "rounds": {
+    "final": "Finale",
+    "semifinals": "Halbfinale",
+    "quarterfinals": "Viertelfinale",
+    "round": "Runde {{number}}"
+  },
+  "entry": {
+    "by": "von {{name}}",
+    "imageAlt": "Beitrag von {{name}}"
+  },
+  "bracket": {
+    "tbd": "offen",
+    "bye": "kommt automatisch weiter"
+  },
+  "home": {
+    "tagline": "Reicht etwas ein. Tretet im Duell gegeneinander an. Alle stimmen ab.",
+    "joinTitle": "Spiel beitreten",
+    "codePlaceholder": "CODE",
+    "joining": "Trete bei…",
+    "join": "Beitreten",
+    "hostHint": "Du richtest das Spiel aus? Öffne diese Seite auf einem Fernseher oder Laptop, den alle sehen können.",
+    "hostPassword": "Host-Passwort",
+    "creating": "Wird erstellt…",
+    "create": "Raum erstellen"
+  },
+  "host": {
+    "join": "Beitreten: {{code}}",
+    "players": "Mitspielende ({{count}})",
+    "toggleSound": "Soundeffekte an/aus",
+    "fullscreen": "Vollbild (F)",
+    "lobby": {
+      "scanToJoin": "Zum Beitreten scannen oder öffnen:",
+      "qrLabel": "QR-Code zum Beitreten",
+      "roomCode": "Raumcode",
+      "players": "Mitspielende",
+      "waitingForPlayers": "Warte auf Mitspielende…",
+      "kick": "{{name}} entfernen",
+      "kickConfirm": "{{name}} entfernen?",
+      "submitted": "{{submitted}} Beiträge eingereicht",
+      "bracketSize": "Turnierbaum mit {{size}} Plätzen",
+      "byes_one": "{{n}} Freilos",
+      "byes_other": "{{n}} Freilose",
+      "bracketFull": "Turnier voll: Wer jetzt beitritt, kann nur abstimmen",
+      "start": "Spiel starten"
+    },
+    "settings": {
+      "title": "Einstellungen",
+      "maxEntries": "Maximale Beiträge",
+      "auto": "Automatisch (bis {{max}})",
+      "voteTimer": "Abstimmungszeit",
+      "seconds_one": "{{count}} Sekunde",
+      "seconds_other": "{{count}} Sekunden",
+      "entries": "Beiträge",
+      "imageOrText": "Bild und/oder Text",
+      "imageOnly": "Nur Bild",
+      "textOnly": "Nur Text",
+      "ties": "Gleichstand",
+      "suddenDeath": "{{seconds}} s Stechen, dann Zufall",
+      "random": "Zufall",
+      "hostDecides": "Host entscheidet",
+      "showLiveVotes": "Stimmen live anzeigen",
+      "allowSelfVote": "Teilnehmende dürfen im eigenen Duell abstimmen"
+    },
+    "match": {
+      "progress": "Duell {{current}} von {{total}}",
+      "suddenDeath": "Stechen!",
+      "winner": "SIEG",
+      "pickThis": "Diesen wählen",
+      "tie": "GLEICHSTAND",
+      "vs": "VS",
+      "voted": "{{voted}} / {{eligible}} abgestimmt",
+      "resultsAtReveal": "Ergebnis bei der Auflösung",
+      "tieHost": "Gleichstand! Host, wähle den Siegerbeitrag.",
+      "decidedBy": {
+        "suddenDeath": "Im Stechen gewonnen",
+        "random": "Gleichstand per Zufall entschieden",
+        "host": "Gleichstand vom Host entschieden",
+        "forfeit": "Gegenüber entfernt: kommt automatisch weiter"
+      }
+    },
+    "overview": {
+      "upNext": "Als Nächstes: {{a}} gegen {{b}}",
+      "startingIn": "Start in {{count}} s",
+      "paused": "pausiert"
+    },
+    "finished": {
+      "champion": "🏆 Champion 🏆",
+      "noChampion": "Kein Sieg: Alle Beiträge wurden entfernt."
+    },
+    "controls": {
+      "playAgain": "Nochmal spielen",
+      "resume": "▶ Fortsetzen",
+      "pause": "❚❚ Pause",
+      "skipTimer": "⏭ Timer überspringen",
+      "next": "Weiter →",
+      "startMatch": "Duell starten →",
+      "reset": "Zurücksetzen",
+      "resetConfirm": "Dieses Spiel beenden und zurück zur Lobby? Die Beiträge werden gelöscht."
+    },
+    "manage": {
+      "label": "Mitspielende verwalten",
+      "players": "Mitspielende",
+      "kick": "Entfernen",
+      "noPlayers": "Noch niemand da.",
+      "entries": "Beiträge",
+      "entriesHint": "Wird ein Beitrag entfernt, kommt sein Gegenüber weiter.",
+      "removed": "entfernt",
+      "remove": "Entfernen",
+      "removeConfirm": "Den Beitrag von {{name}} aus dem Turnier entfernen?"
+    }
+  },
+  "player": {
+    "joinForm": {
+      "title": "Raum {{code}} beitreten",
+      "name": "Dein Name",
+      "namePlaceholder": "z. B. Sam",
+      "joining": "Trete bei…",
+      "join": "Beitreten"
+    },
+    "lobby": {
+      "howToPlay": "Wie möchtest du mitspielen?",
+      "compete": "🥊 Antreten",
+      "competeHint": "Reiche einen Beitrag für das Turnier ein",
+      "bracketFull": "Das Turnier ist voll",
+      "justVote": "🗳️ Nur abstimmen",
+      "justVoteHint": "Wähle in jedem Duell deinen Favoriten",
+      "youreVoter": "Du stimmst ab",
+      "waitingForStart": "Warte, bis der Host das Spiel startet…",
+      "bracketFullShort": "Turnier ist voll",
+      "switchToCompeting": "Doch antreten",
+      "submitted": "Beitrag eingereicht! Warte, bis der Host startet…",
+      "editEntry": "Beitrag bearbeiten",
+      "withdrawConfirm": "Beitrag zurückziehen und nur abstimmen?",
+      "switchToVoting": "Doch nur abstimmen"
+    },
+    "editor": {
+      "title": "Dein Beitrag",
+      "hintImage": "Füge ein Bild hinzu. Es wird mit deinem Namen angezeigt.",
+      "hintText": "Schreib deinen Beitrag. Er wird mit deinem Namen angezeigt.",
+      "hintBoth": "Füge ein Bild, einen Text oder beides hinzu. Dein Beitrag wird mit deinem Namen angezeigt.",
+      "imageAlt": "Dein Beitrag",
+      "removeImage": "Bild entfernen",
+      "processing": "Wird verarbeitet…",
+      "noImage": "Noch kein Bild",
+      "camera": "📷 Kamera",
+      "gallery": "🖼️ Galerie",
+      "text": "Text",
+      "caption": "Text (optionale Bildunterschrift)",
+      "textPlaceholder": "Schreib etwas…",
+      "uploading": "Wird hochgeladen…",
+      "save": "Beitrag speichern",
+      "submit": "Beitrag einreichen",
+      "cancel": "Abbrechen",
+      "justVote": "Doch lieber nur abstimmen"
+    },
+    "status": {
+      "alive": "Dein Beitrag ist noch im Rennen 💪",
+      "eliminated": "Dein Beitrag ist ausgeschieden ({{round}}).",
+      "removed": "Dein Beitrag wurde vom Host entfernt.",
+      "champion": "Dein Beitrag hat gewonnen! 🏆"
+    },
+    "match": {
+      "waiting": "Warte auf das nächste Duell…",
+      "advances": "Dein Beitrag kommt weiter! 🎉",
+      "eliminated": "Du bist ausgeschieden 😢",
+      "pickWon": "Dein Favorit hat gewonnen!",
+      "wins": "{{name}} gewinnt!",
+      "tieDeciding": "Gleichstand! Der Host entscheidet…",
+      "yourEntryUp": "Dein Beitrag ist dran! 🔥",
+      "suddenDeath": "Stechen! Stimm nochmal ab!",
+      "voteSaved": "Stimme gespeichert. Tippe auf den anderen, um sie zu ändern.",
+      "tapFavourite": "Tippe auf deinen Favoriten!",
+      "yourVote": "✓ Deine Stimme",
+      "you": "Du",
+      "voted": "{{voted}}/{{eligible}} abgestimmt",
+      "blocked": {
+        "ownMatchup": "Im eigenen Duell kannst du nicht abstimmen.",
+        "paused": "Pausiert"
+      }
+    },
+    "overview": {
+      "upNextYou": "Dein Beitrag ist als Nächstes dran!",
+      "waiting": "Warte auf das nächste Duell",
+      "versus": "{{a}} gegen {{b}}",
+      "paused": "Der Host hat das Spiel pausiert."
+    },
+    "finished": {
+      "youWon": "Du hast das Turnier gewonnen!",
+      "champion": "{{name}} hat gewonnen!",
+      "gameOver": "Spiel vorbei",
+      "waiting": "Warte, bis der Host eine neue Runde startet…"
+    }
+  },
+  "errors": {
+    "roomNotFound": "Raum nicht gefunden. Prüfe den Code.",
+    "nameRequired": "Bitte gib einen Namen ein.",
+    "nameTaken": "Dieser Name ist in diesem Raum schon vergeben.",
+    "roomFull": "Dieser Raum ist voll.",
+    "notInRoom": "Du bist nicht mehr in diesem Raum.",
+    "sessionExpired": "Sitzung abgelaufen. Bitte tritt erneut bei.",
+    "unknownPlayer": "Unbekannte Sitzung. Bitte tritt erneut bei.",
+    "playerNotFound": "Diese Person ist nicht mehr im Raum.",
+    "notHost": "Du bist nicht der Host dieses Raums.",
+    "hostOnly": "Das kann nur der Host.",
+    "playersOnly": "Das können nur Mitspielende.",
+    "notConnected": "Nicht mit einem Raum verbunden.",
+    "gameStarted": "Das Spiel hat bereits begonnen.",
+    "bracketFull": "Das Turnier ist voll ({{max}} Beiträge). Du kannst aber abstimmen!",
+    "notCompetitor": "Wähle „Antreten“, bevor du einen Beitrag einreichst.",
+    "textOnly": "In diesem Raum sind nur Textbeiträge erlaubt.",
+    "imageRequired": "Bitte füge ein Bild hinzu.",
+    "textRequired": "Bitte gib einen Text ein.",
+    "entryEmpty": "Füge ein Bild oder einen Text hinzu.",
+    "needTwoCompetitors": "Mindestens 2 Teilnehmende nötig (bisher {{current}}).",
+    "tooManyCompetitors": "Zu viele Teilnehmende ({{current}}) für ein Turnier mit {{max}} Plätzen. Erhöhe das Maximum oder bitte jemanden, nur abzustimmen.",
+    "waitingForEntries_one": "Warte noch auf {{count}} Beitrag.",
+    "waitingForEntries_other": "Warte noch auf {{count}} Beiträge.",
+    "nothingToPause": "Gerade gibt es nichts zu pausieren.",
+    "notPaused": "Das Spiel ist nicht pausiert.",
+    "noVoteRunning": "Gerade läuft keine Abstimmung.",
+    "nothingToAdvance": "Gerade gibt es nichts zum Weiterschalten.",
+    "pickWinner": "Wähle einen Siegerbeitrag, um den Gleichstand aufzulösen.",
+    "noTie": "Es gibt keinen Gleichstand.",
+    "unknownEntry": "Unbekannter Beitrag.",
+    "gameOver": "Das Spiel ist vorbei.",
+    "votingClosed": "Die Abstimmung für dieses Duell ist beendet.",
+    "gamePaused": "Das Spiel ist pausiert.",
+    "ownMatchup": "Im eigenen Duell kannst du nicht abstimmen.",
+    "imageTooLarge": "Das Bild ist zu groß (max. {{mb}} MB).",
+    "unsupportedImage": "Nicht unterstütztes Bildformat. Verwende JPEG, PNG, WebP oder GIF.",
+    "invalidUpload": "Ungültiger Upload.",
+    "uploadFailed": "Hochladen fehlgeschlagen.",
+    "passwordRequired": "Zum Erstellen eines Raums ist ein Passwort nötig.",
+    "wrongPassword": "Falsches Passwort.",
+    "passwordLocked": "Zu viele falsche Passwörter. Versuche es in ein paar Minuten erneut.",
+    "serverFull": "Der Server ist voll, versuche es später erneut.",
+    "tooManyRooms": "Zu viele Räume erstellt, bitte warte kurz.",
+    "tooManyJoins": "Gerade treten zu viele gleichzeitig bei, versuche es gleich nochmal.",
+    "tooManyUploads": "Zu viele Uploads, warte kurz und versuche es erneut.",
+    "slowDown": "Nicht so schnell.",
+    "invalidRequest": "Ungültige Anfrage.",
+    "badRequest": "Ungültige Anfrage.",
+    "notFound": "Nicht gefunden.",
+    "serverError": "Etwas ist schiefgelaufen.",
+    "notHostScreen": "Dieser Bildschirm ist nicht der Host dieses Raums.",
+    "kicked": "Der Host hat dich aus dem Raum entfernt.",
+    "roomClosed": "Dieser Raum wurde wegen Inaktivität geschlossen.",
+    "roomGone": "Diesen Raum gibt es nicht mehr.",
+    "offline": "Keine Verbindung, neuer Versuch…",
+    "noResponse": "Der Server hat nicht geantwortet.",
+    "requestFailed": "Anfrage fehlgeschlagen ({{status}}).",
+    "notAnImage": "Diese Datei ist kein Bild.",
+    "imageTooBig": "Dieses Bild ist zu groß.",
+    "imageUnreadable": "Dieses Bild konnte nicht gelesen werden. Versuche ein JPEG oder PNG.",
+    "heicFailed": "Dieses HEIC-Foto konnte nicht umgewandelt werden. Mach einen Screenshot davon oder verwende JPEG.",
+    "noCanvas": "Dein Browser kann keine Bilder verarbeiten.",
+    "compressFailed": "Das Bild konnte nicht komprimiert werden.",
+    "sessionLost": "Sitzung verloren. Bitte tritt erneut bei.",
+    "fullscreenUnavailable": "Vollbild ist hier nicht verfügbar.",
+    "codeLength": "Raumcodes haben 4–5 Zeichen.",
+    "noRoomWithCode": "Kein Raum mit dem Code {{code}}. Schau auf den Hauptbildschirm."
+  }
+}

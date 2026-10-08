@@ -4,6 +4,7 @@ A self-hosted, real-time party game. Players join from their phones by scanning 
 
 - **Main screen** (TV or laptop): room code and QR code, lobby, settings, matchups with a big countdown, winner reveal, bracket overview, and the champion. Includes a full-screen button and sound effects you can turn off.
 - **Phones**: join with a name, pick **Compete** or **Just vote**, submit an entry (camera or gallery), vote by tapping, and always see what is going on ("Your entry is up!", "You've been eliminated", …).
+- **Languages**: English and German. Each device follows its browser language and has a language switcher; see [Languages](#languages).
 
 ## Contents
 
@@ -13,6 +14,7 @@ A self-hosted, real-time party game. Players join from their phones by scanning 
 - [Running with Docker](#running-with-docker)
 - [Deploying](#deploying)
 - [How the game works](#how-the-game-works)
+- [Languages](#languages)
 - [Limitations](#limitations)
 
 ## Architecture
@@ -176,6 +178,20 @@ By default anyone who can reach the site can create a room. Set `HOST_PASSWORD` 
 - Rate limits: room creation per IP, joins and uploads per room, uploads per player, and socket events per connection.
 - Names and texts are sanitized (control and zero-width characters stripped, whitespace collapsed, length-capped) and always rendered as text, never HTML.
 - Uploads are validated by magic bytes and size, stored under random file names, and served with `X-Content-Type-Options: nosniff`.
+
+## Languages
+
+The UI is translated with [i18next](https://www.i18next.com/) and [react-i18next](https://react.i18next.com/).
+
+- **Which language is shown:** a language picked in the switcher (remembered per device in `localStorage`), otherwise the browser's language (`de-AT` counts as `de`), otherwise English. Every device chooses on its own, so the TV and each phone can show different languages. Entries are shown as written.
+- **Where the texts live:** `client/src/i18n/locales/<language>.json`. English server messages (errors, lobby status) are in `shared/messages.ts`: the server sends a message code plus parameters, and each browser translates it.
+- **Typed keys:** `t('some.key')` is type-checked against the English texts, so a misspelled key fails `npm run typecheck`.
+
+To add a language, e.g. French:
+
+1. Copy `client/src/i18n/locales/de.json` to `fr.json` and translate the values. Keep the `{{placeholders}}`; plural keys use [i18next's suffixes](https://www.i18next.com/translation-function/plurals) (`_one`, `_other`, and `_few`/`_many` where the language needs them).
+2. Import it in `client/src/i18n/resources.ts` and add `{ code: 'fr', label: 'Français' }` to `LANGUAGES`.
+3. Run `npm test`: it checks that every language has exactly the English keys and placeholders.
 
 ## Limitations
 
