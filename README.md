@@ -11,7 +11,7 @@ A self-hosted, real-time party game. Players join from their phones by scanning 
 - [Local development](#local-development)
 - [Environment variables](#environment-variables)
 - [Running with Docker](#running-with-docker)
-- [Deploying on Coolify](#deploying-on-coolify)
+- [Deploying](#deploying)
 - [How the game works](#how-the-game-works)
 - [Limitations](#limitations)
 
@@ -77,7 +77,7 @@ To run locally without Docker in production mode: `npm run build && npm start`, 
 | `PORT` | `3000` | Port for HTTP and WebSockets |
 | `PUBLIC_URL` | *(empty)* | Base URL for the QR code and join link, e.g. `https://bracket.example.com`. A bare domain gets `https://` added. If empty, the URL is derived from the request (honouring `X-Forwarded-Proto` / `X-Forwarded-Host`). |
 | `HOST_PASSWORD` | *(empty)* | If set, creating a room requires this password. Joining a room never does. Empty = anyone can create rooms. |
-| `TRUST_PROXY` | `1` | How many reverse proxies sit in front of the app (Express `trust proxy`). `1` fits Coolify; use `2` behind e.g. Cloudflare + Coolify, or a list of trusted IPs/subnets. Used to find the real client IP for rate limits. |
+| `TRUST_PROXY` | `1` | How many reverse proxies sit in front of the app (Express `trust proxy`). `1` = one proxy (the usual setup); `2` if another layer such as a CDN sits in front of it; or a list of trusted IPs/subnets. Used to find the real client IP for rate limits. |
 | `DATA_DIR` | `/data` (prod), `./data` (dev) | Where uploaded images are stored |
 | `ROOM_TTL_HOURS` | `6` | Delete rooms (and images) after this long without activity |
 | `MAX_UPLOAD_MB` | `5` | Server-side size limit per image |
@@ -93,34 +93,55 @@ docker build -t image-bracket .
 docker run -p 3000:3000 -v image-bracket-data:/data image-bracket
 ```
 
-Or with Compose: `docker compose -f docker-compose.yml -f docker-compose.local.yml up --build`. The `.local.yml` override publishes port 3000 on your machine. The base `docker-compose.yml` intentionally publishes no host ports, because on Coolify the proxy handles routing.
+Or with Compose: `docker compose -f docker-compose.yml -f docker-compose.local.yml up --build`. The `.local.yml` override publishes port 3000 on your machine. The base `docker-compose.yml` intentionally publishes no host ports, because in production a reverse proxy handles routing.
 
 The image is multi-stage (`node:22-alpine`), runs as the non-root `node` user, `EXPOSE`s 3000, declares `/data` as a volume, and has a `HEALTHCHECK` against `GET /health`.
 
-## Deploying on Coolify
+## Deploying
 
-### Option A: Dockerfile build pack (recommended)
+The app is a single Docker container. It runs on any host or platform that can build a `Dockerfile` (or run `docker-compose.yml`) behind an HTTPS reverse proxy. What it needs:
 
-1. **Push this repository** to GitHub, GitLab, or any Git host Coolify can reach.
-2. In Coolify, open your project and environment, then choose **+ New → Resource**.
-3. Pick **Public Repository** (paste the URL) or **Private Repository (with GitHub App / Deploy Key)**, and select the branch.
-4. Set **Build Pack** to **Dockerfile**. The Dockerfile is at the repository root (`/Dockerfile`).
-5. Under **Network**, set **Ports Exposes** to `3000`. Leave **Ports Mappings** empty, since Coolify's proxy routes traffic to the container.
-6. Under **General → Domains**, enter your domain, e.g. `https://bracket.example.com`. Point the domain's DNS A/AAAA record at your Coolify server. Coolify's proxy (Traefik/Caddy) requests the HTTPS certificate automatically, and WebSockets work through it without extra configuration.
-7. Under **Environment Variables**, add:
-   - `PUBLIC_URL=https://bracket.example.com` (recommended, so QR codes always use the public domain)
-   - optionally `HOST_PASSWORD=…` so only people who know it can create rooms (see [Restricting room creation](#restricting-room-creation))
-   - optionally `ROOM_TTL_HOURS`, `MAX_UPLOAD_MB`, … (see the table above)
-8. Under **Persistent Storage**, choose **+ Add → Volume Mount**, give it a name (e.g. `image-bracket-data`) and set **Destination Path** to `/data`. This keeps uploaded images across redeploys.
-9. Optional: under **Health Checks**, enable it with path `/health` and port `3000`. The Dockerfile already includes a `HEALTHCHECK`.
-10. Click **Deploy**. When it finishes, open the domain, click **Create room**, and scan the QR code with a phone.
+1. **The container**, built from the `Dockerfile` at the repository root. It listens on port `3000`.
+2. **A reverse proxy** in front that terminates HTTPS and routes your domain (e.g. `bracket.example.com`) to port 3000. It must:
+   - pass WebSocket upgrades through (Socket.IO uses them; it falls back to long polling otherwise),
+   - forward the original `Host` (or `X-Forwarded-Host`) and `X-Forwarded-Proto`, so join links come out as `https://your-domain/…`,
+   - allow request bodies of at least `MAX_UPLOAD_MB` (default 5 MB) for image uploads.
 
-### Option B: Docker Compose build pack
+   Most container platforms and Traefik/Caddy do this out of the box; nginx needs the config below.
+3. **A persistent volume on `/data`** for uploaded images (`docker-compose.yml` declares one).
+4. **Environment variables** (see the table above):
+   - `PUBLIC_URL=https://bracket.example.com` (recommended, so QR codes always use the public domain no matter how the proxy behaves),
+   - optionally `HOST_PASSWORD` (see [Restricting room creation](#restricting-room-creation)),
+   - `TRUST_PROXY` matching the number of proxies in front of the app (the default `1` fits a single proxy).
+5. Optionally a **health check** on `GET /health` (the Dockerfile already declares one).
 
-1. Create a new resource from the repository as above, but set **Build Pack** to **Docker Compose**, with the compose file at `/docker-compose.yml`.
-2. Coolify reads `SERVICE_FQDN_APP_3000` and generates a domain that routes to port 3000. You can change it under the `app` service's **Domains** setting. `PUBLIC_URL` defaults to `${SERVICE_FQDN_APP}`; the server adds `https://` when the value has no scheme.
-3. The named volume `bracket-data` is mounted at `/data` and Coolify keeps it across redeploys.
-4. Adjust the other variables (`HOST_PASSWORD`, `ROOM_TTL_HOURS`, `MAX_UPLOAD_MB`, …) in Coolify's **Environment Variables** tab, then **Deploy**.
+Then open the domain, click **Create room**, and scan the QR code with a phone.
+
+### Example: nginx
+
+Run the container with the port bound to localhost only, e.g. `docker run -d -p 127.0.0.1:3000:3000 -v image-bracket-data:/data -e PUBLIC_URL=https://bracket.example.com image-bracket`, and add a server block like this (TLS settings omitted):
+
+```nginx
+server {
+    server_name bracket.example.com;
+    client_max_body_size 6m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Example: Coolify
+
+- **Dockerfile build pack:** create a resource from the Git repository with the **Dockerfile** build pack, set **Ports Exposes** to `3000` (no port mappings), enter your domain, add the environment variables, and add a **Volume Mount** with destination `/data`.
+- **Docker Compose build pack:** point it at `docker-compose.yml`. The `SERVICE_FQDN_APP_3000` line makes Coolify generate a domain for the service, and `PUBLIC_URL` defaults to that domain unless you set your own. The compose file already declares the `/data` volume.
 
 ### Restricting room creation
 
@@ -128,13 +149,13 @@ By default anyone who can reach the site can create a room. Set `HOST_PASSWORD` 
 
 - The home page shows a password field next to **Create room**. Joining a room (by QR code or room code) never asks for it, so guests are unaffected.
 - It is a single shared password, not user accounts. Anyone who knows it can host.
-- After 10 wrong attempts from one IP address, that address must wait 15 minutes. This relies on the real client IP, so keep `TRUST_PROXY` matched to your proxy setup (the default `1` fits Coolify).
+- After 10 wrong attempts from one IP address, that address must wait 15 minutes. This relies on the real client IP, so keep `TRUST_PROXY` matched to your proxy setup (the default `1` means one proxy in front).
 - Change the password by updating the variable and redeploying. Running rooms are not affected.
 
 ### Notes
 
 - **Run a single instance only** (no horizontal scaling or replicas). Rooms live in the memory of one process. A redeploy or restart ends any running games, though images on `/data` are cleaned up automatically.
-- The app trusts `X-Forwarded-*` headers from one proxy hop (`TRUST_PROXY=1`), which matches Coolify's proxy. Don't expose the container port directly to the internet without a proxy in front.
+- The app trusts `X-Forwarded-*` headers from one proxy hop (`TRUST_PROXY=1`). Don't expose the container port directly to the internet without a proxy in front.
 - If you use a **bind mount** instead of a volume for `/data`, make sure the folder on the host is writable by UID 1000 (`chown -R 1000:1000 /path/on/host`).
 
 ## How the game works

@@ -8,8 +8,8 @@ function num(name: string, fallback: number): number {
 }
 
 /**
- * Normalise PUBLIC_URL. Coolify's SERVICE_FQDN_* may be a bare host, include a
- * scheme, or be a comma-separated list of domains; unresolved "$VAR" values are ignored.
+ * Normalise PUBLIC_URL. Accepts a bare host (https:// is assumed), a full URL, or a
+ * comma-separated list of domains (the first wins); unresolved "$VAR" values are ignored.
  */
 export function normalizePublicUrl(raw: string | undefined): string | null {
   if (!raw) return null;
@@ -27,7 +27,7 @@ export function normalizePublicUrl(raw: string | undefined): string | null {
 /** Express "trust proxy" setting: hop count, true/false, or a list of trusted IPs/subnets. */
 export function parseTrustProxy(raw: string | undefined): boolean | number | string {
   const v = raw?.trim();
-  if (!v) return 1; // one reverse proxy in front (e.g. Coolify's Traefik/Caddy)
+  if (!v) return 1; // one reverse proxy in front
   if (v === 'true') return true;
   if (v === 'false') return false;
   if (/^\d+$/.test(v)) return Number(v);

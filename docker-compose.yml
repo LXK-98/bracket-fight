@@ -1,6 +1,6 @@
-# Works with Coolify's "Docker Compose" build pack and with plain `docker compose up`.
-# No host ports are published: Coolify's proxy routes the domain to port 3000.
-# For local use without Coolify, run `docker compose -f docker-compose.yml -f docker-compose.local.yml up`.
+# Production compose file. No host ports are published: put a reverse proxy in front
+# that routes your domain to port 3000 (or attach it to the proxy's network).
+# For local use, run `docker compose -f docker-compose.yml -f docker-compose.local.yml up`.
 services:
   app:
     build: .
@@ -8,11 +8,11 @@ services:
     expose:
       - "3000"
     environment:
-      # Tells Coolify to generate a domain for this service and route it to port 3000.
+      # Only used by Coolify (generates a domain routed to port 3000); ignored elsewhere.
       - SERVICE_FQDN_APP_3000
-      # Base URL used for QR codes / join links. Defaults to the Coolify domain;
-      # the server adds https:// if the value has no scheme. Empty = use the request host.
-      - PUBLIC_URL=${SERVICE_FQDN_APP}
+      # Base URL for QR codes / join links, e.g. https://bracket.example.com.
+      # Falls back to Coolify's generated domain, then to the request host.
+      - PUBLIC_URL=${PUBLIC_URL:-${SERVICE_FQDN_APP:-}}
       # Optional: require this password to create rooms (joining stays open).
       - HOST_PASSWORD=${HOST_PASSWORD:-}
       - PORT=3000

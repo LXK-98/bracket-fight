@@ -1,4 +1,4 @@
-# Local override only (not for Coolify): publish the port on the host.
+# Local override only (not for production): publish the port on the host.
 services:
   app:
     ports:
