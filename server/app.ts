@@ -96,7 +96,9 @@ export async function createApp(config: Config) {
   app.get('/api/rooms/:code/join-info', async (req, res) => {
     const room = roomFrom(req);
     if (!room) return res.status(404).json({ error: 'Room not found.' });
-    const base = config.publicUrl ?? `${req.protocol}://${req.get('host')}`;
+    // Behind a reverse proxy (trust proxy is on) prefer the original host it forwards.
+    const host = req.get('x-forwarded-host')?.split(',')[0].trim() || req.get('host');
+    const base = config.publicUrl ?? `${req.protocol}://${host}`;
     const joinUrl = `${base}/join/${room.code}`;
     const qrSvg = await QRCode.toString(joinUrl, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
     res.json({ joinUrl, qrSvg });

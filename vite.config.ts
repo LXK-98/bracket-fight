@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const backend = `http://localhost:${process.env.PORT ?? 3000}`;
+// Keep the browser's Host header (changeOrigin: false) so the server builds
+// join links / QR codes for the address the host screen was opened on.
+const backend = { target: `http://localhost:${process.env.PORT ?? 3000}`, changeOrigin: false };
 
 export default defineConfig({
   root: 'client',
@@ -19,7 +21,7 @@ export default defineConfig({
       '/api': backend,
       '/uploads': backend,
       '/health': backend,
-      '/socket.io': { target: backend, ws: true },
+      '/socket.io': { ...backend, ws: true },
     },
   },
 });

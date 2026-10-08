@@ -104,6 +104,14 @@ describe('server', () => {
     expect(info.joinUrl).toMatch(new RegExp(`^https://127\\.0\\.0\\.1:\\d+/join/${code}$`));
     expect(info.qrSvg).toContain('<svg');
 
+    // A reverse proxy that rewrites Host still yields the public address.
+    const proxied = await (
+      await fetch(`${base}/api/rooms/${code}/join-info`, {
+        headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'bracket.example.com' },
+      })
+    ).json();
+    expect(proxied.joinUrl).toBe(`https://bracket.example.com/join/${code}`);
+
     const host = client();
     expect((await host.emit('host:attach', { code, hostToken: 'wrong' })).ok).toBe(false);
     expect((await host.emit('host:attach', { code, hostToken: created.hostToken })).ok).toBe(true);
