@@ -20,6 +20,12 @@ export class RateLimiter {
     return true;
   }
 
+  /** True if the key has used up its allowance in the current window (does not count). */
+  blocked(key: string, now = Date.now()): boolean {
+    const entry = this.hits.get(key);
+    return !!entry && entry.resetAt > now && entry.count >= this.limit;
+  }
+
   private prune(now: number) {
     if (this.hits.size < 1000) return;
     for (const [k, v] of this.hits) if (v.resetAt <= now) this.hits.delete(k);

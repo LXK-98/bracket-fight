@@ -18,6 +18,8 @@ beforeAll(async () => {
   const config: Config = {
     port: 0,
     publicUrl: null,
+    hostPassword: null,
+    trustProxy: 1,
     dataDir,
     roomTtlMs: 60_000,
     maxUploadBytes: 64 * 1024,

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -21,6 +22,13 @@ interface SocketData {
 type AppSocket = Socket<any, any, any, SocketData>;
 
 const channel = (code: string) => `room:${code}`;
+
+/** Constant-time string comparison (hashing first makes the lengths equal). */
+function safeEqual(a: string, b: string) {
+  const ha = crypto.createHash('sha256').update(a).digest();
+  const hb = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
 
 export async function createApp(config: Config) {
   const storage = new Storage(config.dataDir);
@@ -61,9 +69,10 @@ export async function createApp(config: Config) {
   const uploadRoomLimiter = new RateLimiter(60, 60_000); // uploads per room per minute
   const uploadPlayerLimiter = new RateLimiter(10, 60_000); // uploads per player per minute
   const socketLimiter = new RateLimiter(30, 5_000); // events per socket
+  const passwordFailLimiter = new RateLimiter(10, 15 * 60_000); // wrong host passwords per IP
 
   // ------------------------------------------------------------ HTTP
-  app.set('trust proxy', true);
+  app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -75,8 +84,26 @@ export async function createApp(config: Config) {
     res.json({ ok: true, rooms: rooms.size, uptime: Math.round(process.uptime()) });
   });
 
-  app.post('/api/rooms', (req, res) => {
-    if (!createLimiter.take(req.ip ?? 'unknown')) return res.status(429).json({ error: 'Too many rooms created, slow down.' });
+  app.get('/api/config', (_req, res) => {
+    res.json({ createRequiresPassword: config.hostPassword !== null });
+  });
+
+  app.post('/api/rooms', express.json({ limit: '2kb' }), (req, res) => {
+    const ip = req.ip ?? 'unknown';
+    if (config.hostPassword !== null) {
+      if (passwordFailLimiter.blocked(ip)) {
+        return res.status(429).json({ error: 'Too many wrong passwords. Try again in a few minutes.' });
+      }
+      const given: unknown = req.body?.password;
+      if (typeof given !== 'string' || given === '') {
+        return res.status(401).json({ error: 'A password is required to create a room.' });
+      }
+      if (!safeEqual(given, config.hostPassword)) {
+        passwordFailLimiter.take(ip);
+        return res.status(401).json({ error: 'Wrong password.' });
+      }
+    }
+    if (!createLimiter.take(ip)) return res.status(429).json({ error: 'Too many rooms created, slow down.' });
     try {
       const room = rooms.create();
       res.json({ code: room.code, hostToken: room.hostToken });
@@ -167,7 +194,7 @@ export async function createApp(config: Config) {
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const status = (err as { status?: number }).status ?? 500;
     if (status >= 500) console.error(err);
-    res.status(status).json({ error: status === 404 ? 'Not found.' : 'Server error.' });
+    res.status(status).json({ error: status === 404 ? 'Not found.' : status < 500 ? 'Bad request.' : 'Server error.' });
   });
 
   // ------------------------------------------------------------ sockets

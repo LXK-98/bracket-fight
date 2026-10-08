@@ -317,6 +317,11 @@ textarea {
   color: var(--muted);
 }
 
+.host-password {
+  margin-bottom: 0.8rem;
+  text-align: center;
+}
+
 /* ------------------------------------------------------------ entry card */
 
 .entry-card {

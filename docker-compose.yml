@@ -13,6 +13,8 @@ services:
       # Base URL used for QR codes / join links. Defaults to the Coolify domain;
       # the server adds https:// if the value has no scheme. Empty = use the request host.
       - PUBLIC_URL=${SERVICE_FQDN_APP}
+      # Optional: require this password to create rooms (joining stays open).
+      - HOST_PASSWORD=${HOST_PASSWORD:-}
       - PORT=3000
       - DATA_DIR=/data
       - ROOM_TTL_HOURS=${ROOM_TTL_HOURS:-6}

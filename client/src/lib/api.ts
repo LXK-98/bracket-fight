@@ -5,7 +5,13 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export const api = {
-  createRoom: () => fetch('/api/rooms', { method: 'POST' }).then((r) => json<{ code: string; hostToken: string }>(r)),
+  config: () => fetch('/api/config').then((r) => json<{ createRequiresPassword: boolean }>(r)),
+  createRoom: (password?: string) =>
+    fetch('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(password ? { password } : {}),
+    }).then((r) => json<{ code: string; hostToken: string }>(r)),
   getRoom: (code: string) => fetch(`/api/rooms/${encodeURIComponent(code)}`).then((r) => json<{ code: string; phase: string }>(r)),
   joinInfo: (code: string) =>
     fetch(`/api/rooms/${encodeURIComponent(code)}/join-info`).then((r) => json<{ joinUrl: string; qrSvg: string }>(r)),

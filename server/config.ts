@@ -24,9 +24,22 @@ export function normalizePublicUrl(raw: string | undefined): string | null {
   }
 }
 
+/** Express "trust proxy" setting: hop count, true/false, or a list of trusted IPs/subnets. */
+export function parseTrustProxy(raw: string | undefined): boolean | number | string {
+  const v = raw?.trim();
+  if (!v) return 1; // one reverse proxy in front (e.g. Coolify's Traefik/Caddy)
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  if (/^\d+$/.test(v)) return Number(v);
+  return v;
+}
+
 export const config = {
   port: num('PORT', 3000),
   publicUrl: normalizePublicUrl(process.env.PUBLIC_URL),
+  /** When set, creating a room requires this password. Joining stays open. */
+  hostPassword: process.env.HOST_PASSWORD || null,
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   dataDir: path.resolve(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/data' : './data')),
   roomTtlMs: num('ROOM_TTL_HOURS', 6) * 60 * 60 * 1000,
   maxUploadBytes: Math.round(num('MAX_UPLOAD_MB', 5) * 1024 * 1024),

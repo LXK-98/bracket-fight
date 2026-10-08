@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { navigate } from '../lib/router';
 import { sound } from '../lib/sound';
@@ -8,13 +8,20 @@ export function Home() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [password, setPassword] = useState('');
 
-  const create = async () => {
+  useEffect(() => {
+    api.config().then((c) => setNeedsPassword(c.createRequiresPassword), () => {});
+  }, []);
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
     setBusy('create');
     setError(null);
     sound.unlock();
     try {
-      const room = await api.createRoom();
+      const room = await api.createRoom(needsPassword ? password : undefined);
       hostToken.set(room.code, room.hostToken);
       navigate(`/host/${room.code}`);
     } catch (err) {
@@ -65,12 +72,23 @@ export function Home() {
         </button>
       </form>
 
-      <div className="card home-create">
+      <form className="card home-create" onSubmit={create}>
         <p>Hosting? Open this on a TV or laptop everyone can see.</p>
-        <button className="btn btn-secondary btn-big" onClick={create} disabled={busy !== null}>
+        {needsPassword && (
+          <input
+            type="password"
+            className="host-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Host password"
+            aria-label="Host password"
+            autoComplete="current-password"
+          />
+        )}
+        <button className="btn btn-secondary btn-big" disabled={busy !== null || (needsPassword && !password)}>
           {busy === 'create' ? 'Creating…' : 'Create room'}
         </button>
-      </div>
+      </form>
 
       {error && <p className="error">{error}</p>}
     </main>

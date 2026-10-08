@@ -7,6 +7,7 @@ server.listen(config.port, () => {
   console.log(`Image Bracket listening on :${config.port}`);
   console.log(`  data dir:   ${config.dataDir}`);
   console.log(`  public URL: ${config.publicUrl ?? '(from request host)'}`);
+  console.log(`  room creation: ${config.hostPassword ? 'password required' : 'open to everyone'}`);
 });
 
 let closing = false;
